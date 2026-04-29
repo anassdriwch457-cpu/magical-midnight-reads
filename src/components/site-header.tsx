@@ -65,7 +65,7 @@ export function SiteHeader() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Theme" className="text-white hover:text-primary hover:bg-white/10">
-                {theme === "magic" ? <Sparkles className="h-[18px] w-[18px]" /> : theme === "midnight" ? <Moon className="h-[18px] w-[18px]" /> : theme === "concrete" ? <Square className="h-[18px] w-[18px]" /> : <Palette className="h-[18px] w-[18px]" style={{ color: accent }} />}
+                {theme === "magic" ? <Sparkles className="h-[18px] w-[18px]" /> : theme === "midnight" ? <Moon className="h-[18px] w-[18px]" /> : theme === "concrete" ? <Square className="h-[18px] w-[18px]" /> : <Palette className="h-[18px] w-[18px]" />}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-60">
@@ -77,15 +77,18 @@ export function SiteHeader() {
               <DropdownMenuLabel className="flex items-center gap-2"><Palette className="h-3.5 w-3.5" /> Custom Accent</DropdownMenuLabel>
               <div className="px-2 pb-2 space-y-2">
                 <div className="grid grid-cols-8 gap-1.5">
-                  {PRESET_ACCENTS.map(c => (
-                    <button
-                      key={c}
-                      onClick={() => setAccent(c)}
-                      aria-label={`Use ${c}`}
-                      className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${accent.toLowerCase() === c.toLowerCase() && theme === "custom" ? "border-foreground" : "border-transparent"}`}
-                      style={{ background: c }}
-                    />
-                  ))}
+                  {PRESET_ACCENTS.map(c => {
+                    const active = accent.toLowerCase() === c.toLowerCase() && theme === "custom";
+                    return (
+                      <button
+                        key={c}
+                        onClick={() => setAccent(c)}
+                        aria-label={`Use ${c}`}
+                        className={`h-6 w-6 rounded-full border transition-transform hover:scale-110 ${active ? "border-foreground ring-2 ring-foreground/40" : "border-border"}`}
+                        style={{ background: c }}
+                      />
+                    );
+                  })}
                 </div>
                 <label className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-2 py-1.5 text-xs">
                   <span className="text-muted-foreground">Pick color</span>
