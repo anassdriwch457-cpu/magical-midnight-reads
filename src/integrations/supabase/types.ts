@@ -140,6 +140,48 @@ export type Database = {
         }
         Relationships: []
       }
+      coin_purchase_sessions: {
+        Row: {
+          amount_total: number | null
+          created_at: string
+          credited_at: string | null
+          credited_coins: number
+          currency: string | null
+          id: string
+          package_id: string
+          stripe_payment_status: string
+          stripe_session_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_total?: number | null
+          created_at?: string
+          credited_at?: string | null
+          credited_coins?: number
+          currency?: string | null
+          id?: string
+          package_id: string
+          stripe_payment_status?: string
+          stripe_session_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_total?: number | null
+          created_at?: string
+          credited_at?: string | null
+          credited_coins?: number
+          currency?: string | null
+          id?: string
+          package_id?: string
+          stripe_payment_status?: string
+          stripe_session_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
