@@ -16,20 +16,21 @@ import {
   Shield, Plus, Pencil, Trash2, Upload, ArrowLeft, BookOpen, Image as ImageIcon,
   BarChart3, Library, Users as UsersIcon, Coins, TrendingUp, Crown, Ban, CheckCircle2,
   Receipt, ArrowDownRight, ArrowUpRight, Settings as SettingsIcon, LayoutGrid, Rows3,
-  Sparkles, Flame, Save, CreditCard, ExternalLink, KeyRound,
+  Sparkles, Flame, Save, CreditCard, ExternalLink, KeyRound, Download,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import { toast } from "sonner";
 import JSZip from "jszip";
+import { MigratorView } from "@/components/admin/migrator-view";
 
 type Series = Tables<"series">;
 type Chapter = Tables<"chapters">;
 
 const ALL_GENRES = ["Action","Adventure","Comedy","Drama","Fantasy","Josei","Magic","Mystery","Romance","School Life","Shoujo","Shounen Ai","Supernatural","Yaoi","Yuri"];
 
-type Tab = "analytics" | "content" | "users" | "finance" | "payments" | "settings";
+type Tab = "analytics" | "content" | "migrator" | "users" | "finance" | "payments" | "settings";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -45,6 +46,7 @@ function AdminPage() {
     const t: Tab[] = [];
     if (canViewAnalytics) t.push("analytics");
     if (canManageContent) t.push("content");
+    if (canManageContent) t.push("migrator");
     if (canManageUsers) t.push("users");
     if (canViewAnalytics) t.push("finance");
     if (isSuperAdmin || isManager) t.push("payments");
@@ -100,6 +102,7 @@ ON CONFLICT DO NOTHING;`}</code></pre>
           <MobileTabs tab={tab} setTab={setTab} allowedTabs={allowedTabs} />
           {tab === "analytics" && <AnalyticsView />}
           {tab === "content" && <ContentView />}
+          {tab === "migrator" && <MigratorView />}
           {tab === "users" && <UsersView canEditRoles={isSuperAdmin} />}
           {tab === "finance" && <FinanceView />}
           {tab === "payments" && <PaymentsView />}
@@ -120,6 +123,7 @@ function AdminSidebar({ tab, setTab, allowedTabs, roleLabel }: {
   const items: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
     { key: "analytics", label: "Dashboard", icon: BarChart3 },
     { key: "content", label: "Library", icon: Library },
+    { key: "migrator", label: "Migrator", icon: Download },
     { key: "users", label: "Users", icon: UsersIcon },
     { key: "finance", label: "Finance", icon: Receipt },
     { key: "payments", label: "Payments", icon: CreditCard },
