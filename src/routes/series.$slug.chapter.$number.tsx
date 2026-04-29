@@ -23,6 +23,7 @@ function ReaderPage() {
   const [series, setSeries] = useState<Series | null>(null);
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const [pages, setPages] = useState<Page[]>([]);
+  const [allChapters, setAllChapters] = useState<number[]>([]);
   const [siblings, setSiblings] = useState<{ prev?: number; next?: number }>({});
   const [unlocked, setUnlocked] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -41,6 +42,7 @@ function ReaderPage() {
 
     const { data: all } = await supabase.from("chapters").select("number").eq("series_id", s.id).order("number", { ascending: true });
     const nums = (all ?? []).map(x => Number(x.number));
+    setAllChapters(nums);
     const idx = nums.indexOf(Number(c.number));
     setSiblings({ prev: idx > 0 ? nums[idx - 1] : undefined, next: idx >= 0 && idx < nums.length - 1 ? nums[idx + 1] : undefined });
 
@@ -142,8 +144,13 @@ function ReaderPage() {
       {/* Content */}
       <div className={`${series.type === "manga" ? "max-w-3xl mx-auto" : "max-w-2xl mx-auto px-4"} pt-20 pb-24`}>
         {series.type === "manga" ? (
-          pages.length === 0 ? <p className="text-center py-12 text-white/60">No pages uploaded.</p> :
+          pages.length === 0 ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="h-8 w-8 rounded-full border-2 border-white/20 border-t-primary animate-spin" />
+            </div>
+          ) : (
             pages.map(p => <img key={p.id} src={p.image_url} alt={`Page ${p.page_number}`} loading="lazy" className="w-full block" />)
+          )
         ) : (
           <article className="prose prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-base text-white/90">
             {chapter.content || "No content."}
@@ -163,9 +170,17 @@ function ReaderPage() {
               </Link>
             </Button>
           ) : <div />}
-          <Button asChild variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10 text-xs uppercase tracking-wider">
-            <Link to="/series/$slug" params={{ slug }}>All chapters</Link>
-          </Button>
+
+          <select
+            value={String(chapter.number)}
+            onChange={(e) => navigate({ to: "/series/$slug/chapter/$number", params: { slug, number: e.target.value } })}
+            className="bg-white/10 hover:bg-white/15 text-white text-xs font-bold uppercase tracking-wider rounded-[4px] h-9 px-3 border border-white/15 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+          >
+            {allChapters.map((n) => (
+              <option key={n} value={String(n)} className="bg-black text-white">CH {n}</option>
+            ))}
+          </select>
+
           {siblings.next !== undefined ? (
             <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-[4px]">
               <Link to="/series/$slug/chapter/$number" params={{ slug, number: String(siblings.next) }}>
