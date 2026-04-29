@@ -16,13 +16,14 @@ import {
   Shield, Plus, Pencil, Trash2, Upload, ArrowLeft, BookOpen, Image as ImageIcon,
   BarChart3, Library, Users as UsersIcon, Coins, TrendingUp, Crown, Ban, CheckCircle2,
   Receipt, ArrowDownRight, ArrowUpRight, Settings as SettingsIcon, LayoutGrid, Rows3,
-  Sparkles, Flame, Save, CreditCard, ExternalLink, KeyRound,
+  Sparkles, Flame, Save, CreditCard, ExternalLink, KeyRound, Download,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import { toast } from "sonner";
 import JSZip from "jszip";
+import { MigratorView } from "@/components/admin/migrator-view";
 
 type Series = Tables<"series">;
 type Chapter = Tables<"chapters">;
