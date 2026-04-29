@@ -102,6 +102,7 @@ ON CONFLICT DO NOTHING;`}</code></pre>
           <MobileTabs tab={tab} setTab={setTab} allowedTabs={allowedTabs} />
           {tab === "analytics" && <AnalyticsView />}
           {tab === "content" && <ContentView />}
+          {tab === "migrator" && <MigratorView />}
           {tab === "users" && <UsersView canEditRoles={isSuperAdmin} />}
           {tab === "finance" && <FinanceView />}
           {tab === "payments" && <PaymentsView />}
