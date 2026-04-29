@@ -157,6 +157,26 @@ function ReaderPage() {
     };
   }, [unlocked]);
 
+  // Track scroll progress through the chapter
+  useEffect(() => {
+    if (!unlocked) return;
+    const el = scrollerRef.current;
+    if (!el) return;
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const max = el.scrollHeight - el.clientHeight;
+        setProgress(max > 0 ? Math.min(100, (el.scrollTop / max) * 100) : 0);
+      });
+    };
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => { cancelAnimationFrame(raf); el.removeEventListener("scroll", onScroll); };
+  }, [unlocked, pages.length]);
+
+  // Auto-enter cinematic on touch devices? keep manual.
+
   const handleUnlock = async () => {
     if (!user) { navigate({ to: "/auth" }); return; }
     if (!chapter) return;
@@ -179,20 +199,53 @@ function ReaderPage() {
     await load();
   };
 
+  const uiVisible = showUI && !cinematic;
+
   const renderTopBar = () => (
     <div
-      className={`fixed top-0 inset-x-0 z-40 bg-gradient-to-b from-black/90 to-transparent transition-opacity duration-300 ${showUI ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      className={`fixed top-0 inset-x-0 z-40 transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
     >
-      <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-        <Link to="/series/$slug" params={{ slug }} className="flex items-center gap-2 text-sm text-white/90 hover:text-primary">
-          <ArrowLeft className="h-4 w-4" />
-          <span className="font-bold truncate max-w-[40vw]">{series?.title ?? "Back to Series"}</span>
-        </Link>
-        <div className="text-xs uppercase tracking-wider text-white/70 font-bold">
-          {chapter ? `CH ${Number(chapter.number)}${chapter.title ? ` · ${chapter.title}` : ""}` : `CH ${number}`}
+      <div className="bg-gradient-to-b from-black/90 to-transparent backdrop-blur-md">
+        <div className="container mx-auto px-4 h-14 flex items-center justify-between gap-3">
+          <Link to="/series/$slug" params={{ slug }} className="flex items-center gap-2 text-sm text-white/90 hover:text-primary min-w-0">
+            <ArrowLeft className="h-4 w-4 shrink-0" />
+            <span className="font-bold truncate max-w-[40vw]">{series?.title ?? "Back to Series"}</span>
+          </Link>
+          <div className="text-xs uppercase tracking-wider text-white/70 font-bold truncate hidden sm:block">
+            {chapter ? `CH ${Number(chapter.number)}${chapter.title ? ` · ${chapter.title}` : ""}` : `CH ${number}`}
+          </div>
+          <button
+            onClick={() => setCinematic(c => !c)}
+            aria-label={cinematic ? "Exit cinematic mode" : "Enter cinematic mode"}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white transition-colors"
+          >
+            {cinematic ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">{cinematic ? "Exit" : "Cinema"}</span>
+          </button>
         </div>
       </div>
     </div>
+  );
+
+  const renderProgressBar = () => (
+    <div className="fixed top-0 inset-x-0 z-50 h-0.5 bg-white/5 pointer-events-none">
+      <div
+        className="h-full bg-gradient-to-r from-primary to-primary/70 transition-[width] duration-150 ease-out shadow-[0_0_8px_var(--neon-purple)]"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  );
+
+  const renderCinemaExit = () => (
+    cinematic && (
+      <button
+        onClick={() => setCinematic(false)}
+        aria-label="Exit cinematic mode"
+        className="fixed top-3 right-3 z-50 inline-flex items-center justify-center h-9 w-9 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur transition-colors"
+      >
+        <Minimize2 className="h-4 w-4" />
+      </button>
+    )
   );
 
   const renderBottomBar = () => (
