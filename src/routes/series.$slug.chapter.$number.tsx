@@ -167,7 +167,11 @@ function ReaderPage() {
       else toast.error(r.error ?? "Failed to unlock");
       return;
     }
-    toast.success("Chapter unlocked!");
+    toast.success(`Chapter ${Number(chapter.number)} unlocked!`, {
+      description: `−${chapter.price} coins · Balance: ${r.balance ?? "—"} coins remaining`,
+      icon: "🔓",
+      duration: 4000,
+    });
     await refreshWallet();
     await load();
   };
