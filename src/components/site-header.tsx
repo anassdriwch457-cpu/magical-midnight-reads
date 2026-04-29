@@ -137,7 +137,7 @@ export function SiteHeader() {
                             onClick={() => { setSearchOpen(false); setQuery(""); }}
                             className="flex items-center gap-3 px-3 py-2 hover:bg-muted/60 transition-colors"
                           >
-                            <img src={h.cover_url ?? ""} alt="" className="h-10 w-7 object-cover rounded bg-muted shrink-0" />
+                            <img src={resolveImage(h.cover_url)} onError={onImageError} alt="" className="h-10 w-7 object-cover rounded bg-muted shrink-0" />
                             <div className="min-w-0">
                               <div className="text-sm font-semibold truncate">{h.title}</div>
                               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{h.type}</div>
