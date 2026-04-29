@@ -5,6 +5,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import { SeriesCard } from "@/components/series-card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { GenreBar } from "@/components/genre-bar";
 
 type Series = Tables<"series">;
 
@@ -42,7 +43,8 @@ function HomePage() {
   return (
     <div className="min-h-screen pb-16">
       <Hero items={trending} />
-      <div className="container mx-auto px-4 space-y-12 mt-12">
+      <GenreBar />
+      <div className="container mx-auto px-4 space-y-12 mt-4">
         <Section title="Popular Manga" items={popular} />
         <Section title="Latest Novel Updates" items={novels} />
         <Section title="New Arrivals" items={latest} />

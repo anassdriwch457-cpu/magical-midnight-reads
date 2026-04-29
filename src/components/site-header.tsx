@@ -3,12 +3,14 @@ import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
-import { Coins, Sparkles, Moon, Square, User, LogOut, Shield } from "lucide-react";
+import { Coins, Sparkles, Moon, Square, User, LogOut, Shield, Palette } from "lucide-react";
 import logo from "@/assets/nuvia-logo.png";
+
+const PRESET_ACCENTS = ["#d946ef", "#a855f7", "#ec4899", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#06b6d4"];
 
 export function SiteHeader() {
   const { user, wallet, isAdmin, signOut } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, accent, setAccent } = useTheme();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl">
@@ -31,14 +33,38 @@ export function SiteHeader() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Theme">
-                {theme === "magic" ? <Sparkles className="h-4 w-4" /> : theme === "midnight" ? <Moon className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                {theme === "magic" ? <Sparkles className="h-4 w-4" /> : theme === "midnight" ? <Moon className="h-4 w-4" /> : theme === "concrete" ? <Square className="h-4 w-4" /> : <Palette className="h-4 w-4" style={{ color: accent }} />}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-60">
               <DropdownMenuLabel>Theme</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => setTheme("magic")}><Sparkles className="mr-2 h-4 w-4" /> Magic</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTheme("midnight")}><Moon className="mr-2 h-4 w-4" /> Midnight</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTheme("concrete")}><Square className="mr-2 h-4 w-4" /> Concrete</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="flex items-center gap-2"><Palette className="h-3.5 w-3.5" /> Custom Accent</DropdownMenuLabel>
+              <div className="px-2 pb-2 space-y-2">
+                <div className="grid grid-cols-8 gap-1.5">
+                  {PRESET_ACCENTS.map(c => (
+                    <button
+                      key={c}
+                      onClick={() => setAccent(c)}
+                      aria-label={`Use ${c}`}
+                      className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${accent.toLowerCase() === c.toLowerCase() && theme === "custom" ? "border-foreground" : "border-transparent"}`}
+                      style={{ background: c }}
+                    />
+                  ))}
+                </div>
+                <label className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-2 py-1.5 text-xs">
+                  <span className="text-muted-foreground">Pick color</span>
+                  <input
+                    type="color"
+                    value={accent}
+                    onChange={(e) => setAccent(e.target.value)}
+                    className="h-6 w-10 cursor-pointer rounded border-0 bg-transparent p-0"
+                  />
+                </label>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
 

@@ -5,6 +5,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import { SeriesCard } from "@/components/series-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { GenreBar } from "@/components/genre-bar";
 
 type Series = Tables<"series">;
 const PAGE_SIZE = 18;
@@ -53,7 +54,9 @@ function BrowsePage() {
   const reset = (fn: () => void) => { fn(); setPage(0); };
 
   return (
-    <div className="container mx-auto px-4 py-10">
+    <div className="pb-10">
+      <GenreBar />
+      <div className="container mx-auto px-4 pt-2">
       <h1 className="text-3xl font-bold mb-2">Browse</h1>
       <p className="text-muted-foreground mb-6">{count} series found</p>
 
@@ -108,6 +111,7 @@ function BrowsePage() {
           <Button variant="outline" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>Next</Button>
         </div>
       )}
+      </div>
     </div>
   );
 }
