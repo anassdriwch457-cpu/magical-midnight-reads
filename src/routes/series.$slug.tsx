@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import type { Tables } from "@/integrations/supabase/types";
 import { Badge } from "@/components/ui/badge";
 import { Lock, Coins, Eye, BookOpen } from "lucide-react";
+import { resolveImage, onImageError } from "@/lib/image";
 
 type Series = Tables<"series">;
 type Chapter = Tables<"chapters">;
@@ -48,13 +49,13 @@ function SeriesDetail() {
   return (
     <div>
       <div className="relative h-[40vh] min-h-[280px] overflow-hidden">
-        <img src={series.banner_url ?? series.cover_url ?? ""} alt="" className="h-full w-full object-cover blur-sm scale-105 opacity-50" />
+        <img src={resolveImage(series.banner_url ?? series.cover_url)} onError={onImageError} alt="" className="h-full w-full object-cover blur-sm scale-105 opacity-50" />
         <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
       </div>
 
       <div className="container mx-auto px-4 -mt-32 relative">
         <div className="grid md:grid-cols-[220px_1fr] gap-8">
-          <img src={series.cover_url ?? ""} alt={series.title} className="w-full max-w-[220px] aspect-[2/3] object-cover rounded-xl shadow-glow" />
+          <img src={resolveImage(series.cover_url)} onError={onImageError} alt={series.title} className="w-full max-w-[220px] aspect-[2/3] object-cover rounded-xl shadow-glow" />
           <div className="space-y-4 pt-4 md:pt-12">
             <div className="flex flex-wrap gap-2">
               <Badge className="bg-brand text-primary-foreground border-0 capitalize">{series.type}</Badge>

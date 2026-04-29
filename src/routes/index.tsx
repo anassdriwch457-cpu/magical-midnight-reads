@@ -7,6 +7,7 @@ import { LatestUpdateCard } from "@/components/latest-update-card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { GenreBar } from "@/components/genre-bar";
+import { resolveImage, onImageError } from "@/lib/image";
 
 type Series = Tables<"series">;
 type Chapter = Tables<"chapters">;
@@ -118,13 +119,12 @@ function Hero({ items }: { items: Series[] }) {
     <section className="relative w-full aspect-[21/9] min-h-[420px] max-h-[80vh] overflow-hidden bg-black">
       {items.map((s, i) => (
         <div key={s.id} className={`absolute inset-0 transition-opacity duration-1000 ${i === idx ? "opacity-100" : "opacity-0"}`}>
-          {(s.banner_url || s.cover_url) && (
-            <img
-              src={s.banner_url ?? s.cover_url ?? ""}
-              alt={s.title}
-              className="h-full w-full object-cover"
-            />
-          )}
+          <img
+            src={resolveImage(s.banner_url ?? s.cover_url)}
+            onError={onImageError}
+            alt={s.title}
+            className="h-full w-full object-cover"
+          />
           <div className="absolute inset-0" style={{ background: "var(--gradient-hero)" }} />
         </div>
       ))}

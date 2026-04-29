@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Coins } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { resolveImage, onImageError } from "@/lib/image";
 
 type Series = Pick<Tables<"series">, "id" | "slug" | "title" | "cover_url" | "type">;
 type Chapter = Pick<Tables<"chapters">, "id" | "number" | "price" | "created_at">;
@@ -37,14 +38,13 @@ export function LatestUpdateCard({
         params={{ slug: series.slug }}
         className="shrink-0 w-[92px] sm:w-[110px] aspect-[2/3] bg-muted overflow-hidden group"
       >
-        {series.cover_url && (
-          <img
-            src={series.cover_url}
-            alt={series.title}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
-          />
-        )}
+        <img
+          src={resolveImage(series.cover_url)}
+          onError={onImageError}
+          alt={series.title}
+          loading="lazy"
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+        />
       </Link>
 
       <div className="flex-1 min-w-0 py-2 pr-2 flex flex-col" style={{ background: "#1A1A1A" }}>
