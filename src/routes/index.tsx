@@ -201,7 +201,7 @@ function Section({ title, items }: { title: string; items: Series[] }) {
           View All →
         </Link>
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-3 gap-y-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
         {items.map((s) => <SeriesCard key={s.id} series={s} />)}
       </div>
     </section>
