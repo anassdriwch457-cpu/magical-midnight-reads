@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TopupRouteImport } from './routes/topup'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as BrowseRouteImport } from './routes/browse'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -20,6 +22,16 @@ import { Route as SeriesSlugChapterNumberRouteImport } from './routes/series.$sl
 const TopupRoute = TopupRouteImport.update({
   id: '/topup',
   path: '/topup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BrowseRoute = BrowseRouteImport.update({
@@ -58,6 +70,8 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/browse': typeof BrowseRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/topup': typeof TopupRoute
   '/series/$slug': typeof SeriesSlugRouteWithChildren
   '/series/$slug/chapter/$number': typeof SeriesSlugChapterNumberRoute
@@ -67,6 +81,8 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/browse': typeof BrowseRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/topup': typeof TopupRoute
   '/series/$slug': typeof SeriesSlugRouteWithChildren
   '/series/$slug/chapter/$number': typeof SeriesSlugChapterNumberRoute
@@ -77,6 +93,8 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/browse': typeof BrowseRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/topup': typeof TopupRoute
   '/series/$slug': typeof SeriesSlugRouteWithChildren
   '/series/$slug/chapter/$number': typeof SeriesSlugChapterNumberRoute
@@ -88,6 +106,8 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/browse'
+    | '/privacy'
+    | '/terms'
     | '/topup'
     | '/series/$slug'
     | '/series/$slug/chapter/$number'
@@ -97,6 +117,8 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/browse'
+    | '/privacy'
+    | '/terms'
     | '/topup'
     | '/series/$slug'
     | '/series/$slug/chapter/$number'
@@ -106,6 +128,8 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/browse'
+    | '/privacy'
+    | '/terms'
     | '/topup'
     | '/series/$slug'
     | '/series/$slug/chapter/$number'
@@ -116,6 +140,8 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
   BrowseRoute: typeof BrowseRoute
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
   TopupRoute: typeof TopupRoute
   SeriesSlugRoute: typeof SeriesSlugRouteWithChildren
 }
@@ -127,6 +153,20 @@ declare module '@tanstack/react-router' {
       path: '/topup'
       fullPath: '/topup'
       preLoaderRoute: typeof TopupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/browse': {
@@ -191,6 +231,8 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
   BrowseRoute: BrowseRoute,
+  PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
   TopupRoute: TopupRoute,
   SeriesSlugRoute: SeriesSlugRouteWithChildren,
 }
