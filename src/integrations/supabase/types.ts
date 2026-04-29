@@ -243,7 +243,7 @@ export type Database = {
       unlock_chapter: { Args: { _chapter_id: string }; Returns: Json }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "super_admin" | "manager"
       series_status: "ongoing" | "completed" | "hiatus"
       series_type: "manga" | "novel"
     }
@@ -373,7 +373,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "super_admin", "manager"],
       series_status: ["ongoing", "completed", "hiatus"],
       series_type: ["manga", "novel"],
     },
