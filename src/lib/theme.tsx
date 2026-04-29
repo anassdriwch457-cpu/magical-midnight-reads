@@ -61,7 +61,7 @@ function applyAccent(hex: string) {
 function clearAccent() {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  ["--primary","--accent","--ring","--neon-purple","--neon-pink","--gradient-brand","--shadow-glow"].forEach(p =>
+  ["--primary","--primary-foreground","--accent","--accent-foreground","--ring","--neon-purple","--neon-pink","--gradient-brand","--shadow-glow"].forEach(p =>
     root.style.removeProperty(p)
   );
 }
