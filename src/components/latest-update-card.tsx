@@ -73,28 +73,38 @@ export function LatestUpdateCard({
                 <Link
                   to="/series/$slug/chapter/$number"
                   params={{ slug: series.slug, number: String(c.number) }}
-                  className="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-white/5 transition-colors group"
+                  className="grid grid-cols-[3.25rem_1fr_auto] items-center gap-2 px-2 py-1.5 hover:bg-white/5 transition-colors group"
                 >
-                  <span className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-xs font-semibold text-foreground/90 group-hover:text-primary truncate">
-                      Ch. {Number(c.number)}
-                    </span>
-                    {fresh && (
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-primary text-primary-foreground">
-                        New
-                      </span>
-                    )}
-                    {free ? (
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded border border-emerald-500/40 text-emerald-400">
-                        Free
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[var(--coin)]">
-                        <Coins className="h-3 w-3" /> {c.price}
-                      </span>
-                    )}
+                  <span
+                    className={`text-xs font-semibold tabular-nums truncate ${
+                      free ? "text-white/85 group-hover:text-white" : "text-[#F47521]"
+                    }`}
+                  >
+                    Ch. {Number(c.number)}
                   </span>
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0">
+
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    {free
+                      ? fresh && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-white/10 text-white/70">
+                            New
+                          </span>
+                        )
+                      : (
+                        <>
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#F47521]">
+                            <Coins className="h-3 w-3" /> {c.price}
+                          </span>
+                          {fresh && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-[#F47521] text-black">
+                              New
+                            </span>
+                          )}
+                        </>
+                      )}
+                  </span>
+
+                  <span className="text-[10px] tabular-nums text-muted-foreground whitespace-nowrap text-right">
                     {timeAgo(c.created_at)}
                   </span>
                 </Link>
