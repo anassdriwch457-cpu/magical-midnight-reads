@@ -9,38 +9,147 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TopupRouteImport } from './routes/topup'
+import { Route as BrowseRouteImport } from './routes/browse'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SeriesSlugRouteImport } from './routes/series.$slug'
+import { Route as SeriesSlugChapterNumberRouteImport } from './routes/series.$slug.chapter.$number'
 
+const TopupRoute = TopupRouteImport.update({
+  id: '/topup',
+  path: '/topup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BrowseRoute = BrowseRouteImport.update({
+  id: '/browse',
+  path: '/browse',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SeriesSlugRoute = SeriesSlugRouteImport.update({
+  id: '/series/$slug',
+  path: '/series/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SeriesSlugChapterNumberRoute = SeriesSlugChapterNumberRouteImport.update({
+  id: '/chapter/$number',
+  path: '/chapter/$number',
+  getParentRoute: () => SeriesSlugRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/auth': typeof AuthRoute
+  '/browse': typeof BrowseRoute
+  '/topup': typeof TopupRoute
+  '/series/$slug': typeof SeriesSlugRouteWithChildren
+  '/series/$slug/chapter/$number': typeof SeriesSlugChapterNumberRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/auth': typeof AuthRoute
+  '/browse': typeof BrowseRoute
+  '/topup': typeof TopupRoute
+  '/series/$slug': typeof SeriesSlugRouteWithChildren
+  '/series/$slug/chapter/$number': typeof SeriesSlugChapterNumberRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/auth': typeof AuthRoute
+  '/browse': typeof BrowseRoute
+  '/topup': typeof TopupRoute
+  '/series/$slug': typeof SeriesSlugRouteWithChildren
+  '/series/$slug/chapter/$number': typeof SeriesSlugChapterNumberRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/browse'
+    | '/topup'
+    | '/series/$slug'
+    | '/series/$slug/chapter/$number'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/browse'
+    | '/topup'
+    | '/series/$slug'
+    | '/series/$slug/chapter/$number'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/browse'
+    | '/topup'
+    | '/series/$slug'
+    | '/series/$slug/chapter/$number'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
+  AuthRoute: typeof AuthRoute
+  BrowseRoute: typeof BrowseRoute
+  TopupRoute: typeof TopupRoute
+  SeriesSlugRoute: typeof SeriesSlugRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/topup': {
+      id: '/topup'
+      path: '/topup'
+      fullPath: '/topup'
+      preLoaderRoute: typeof TopupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/browse': {
+      id: '/browse'
+      path: '/browse'
+      fullPath: '/browse'
+      preLoaderRoute: typeof BrowseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,12 +157,52 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/series/$slug': {
+      id: '/series/$slug'
+      path: '/series/$slug'
+      fullPath: '/series/$slug'
+      preLoaderRoute: typeof SeriesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/series/$slug/chapter/$number': {
+      id: '/series/$slug/chapter/$number'
+      path: '/chapter/$number'
+      fullPath: '/series/$slug/chapter/$number'
+      preLoaderRoute: typeof SeriesSlugChapterNumberRouteImport
+      parentRoute: typeof SeriesSlugRoute
+    }
   }
 }
 
+interface SeriesSlugRouteChildren {
+  SeriesSlugChapterNumberRoute: typeof SeriesSlugChapterNumberRoute
+}
+
+const SeriesSlugRouteChildren: SeriesSlugRouteChildren = {
+  SeriesSlugChapterNumberRoute: SeriesSlugChapterNumberRoute,
+}
+
+const SeriesSlugRouteWithChildren = SeriesSlugRoute._addFileChildren(
+  SeriesSlugRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
+  AuthRoute: AuthRoute,
+  BrowseRoute: BrowseRoute,
+  TopupRoute: TopupRoute,
+  SeriesSlugRoute: SeriesSlugRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
