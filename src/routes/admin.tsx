@@ -1320,3 +1320,144 @@ function FinanceView() {
     </div>
   );
 }
+
+/* ---------------------- MASS PRICE TOOL ---------------------- */
+function MassPriceTool({ seriesId, chapterCount, onDone }: { seriesId: string; chapterCount: number; onDone: () => void }) {
+  const [price, setPrice] = useState("0");
+  const [busy, setBusy] = useState(false);
+
+  const apply = async () => {
+    const p = Math.max(0, parseInt(price) || 0);
+    if (!confirm(`Set the price of ALL ${chapterCount} chapter(s) to ${p} coin(s)? This cannot be undone.`)) return;
+    setBusy(true);
+    const { data, error } = await supabase.rpc("admin_mass_update_chapter_price", { _series_id: seriesId, _price: p });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    const res = data as { success: boolean; updated?: number; error?: string };
+    if (!res.success) return toast.error(res.error ?? "Failed");
+    toast.success(`Updated ${res.updated} chapter(s) to ${p} coins`);
+    onDone();
+  };
+
+  return (
+    <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl p-5 mb-8">
+      <div className="flex items-start gap-3 mb-3">
+        <Coins className="h-5 w-5 text-primary mt-0.5" />
+        <div>
+          <h3 className="font-bold uppercase tracking-wider text-sm">Mass Price Update</h3>
+          <p className="text-xs text-muted-foreground">Set the same coin price across every chapter in this series.</p>
+        </div>
+      </div>
+      <div className="flex flex-col sm:flex-row gap-3 items-end">
+        <div className="flex-1 w-full sm:w-auto">
+          <Label htmlFor="mass-price">New price (0 = free)</Label>
+          <Input id="mass-price" type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} />
+        </div>
+        <Button onClick={apply} disabled={busy || chapterCount === 0} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
+          {busy ? "Applying…" : `Apply to ${chapterCount} chapters`}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------- SITE SETTINGS ---------------------- */
+type SiteSettings = {
+  site_name: string;
+  seo_description: string;
+  hero_series_id: string | null;
+};
+
+function SettingsView() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [settings, setSettings] = useState<SiteSettings>({ site_name: "", seo_description: "", hero_series_id: null });
+  const [seriesList, setSeriesList] = useState<{ id: string; title: string }[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const [s, list] = await Promise.all([
+        supabase.from("site_settings").select("site_name, seo_description, hero_series_id").eq("id", true).maybeSingle(),
+        supabase.from("series").select("id, title").order("title"),
+      ]);
+      if (s.data) setSettings({
+        site_name: s.data.site_name,
+        seo_description: s.data.seo_description,
+        hero_series_id: s.data.hero_series_id,
+      });
+      if (s.error) toast.error(s.error.message);
+      setSeriesList(list.data ?? []);
+      setLoading(false);
+    })();
+  }, []);
+
+  const save = async () => {
+    if (!settings.site_name.trim()) return toast.error("Site name is required");
+    setSaving(true);
+    // Update singleton row
+    const { error } = await supabase
+      .from("site_settings")
+      .update({
+        site_name: settings.site_name.trim(),
+        seo_description: settings.seo_description.trim(),
+        hero_series_id: settings.hero_series_id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", true);
+    if (error) { setSaving(false); return toast.error(error.message); }
+
+    // Sync hero series flag: clear all, set chosen
+    if (settings.hero_series_id) {
+      await supabase.from("series").update({ is_trending: false }).neq("id", settings.hero_series_id);
+      await supabase.from("series").update({ is_trending: true }).eq("id", settings.hero_series_id);
+    }
+
+    setSaving(false);
+    toast.success("Site settings saved");
+  };
+
+  if (loading) return <p className="text-muted-foreground py-8 text-center">Loading…</p>;
+
+  return (
+    <div className="max-w-2xl">
+      <SectionHeader icon={SettingsIcon} title="Site Settings" subtitle="Brand, SEO, and the hero banner" />
+
+      <div className="space-y-5">
+        <GlassCard title="Branding">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="site_name">Site Name</Label>
+              <Input id="site_name" value={settings.site_name} onChange={(e) => setSettings(s => ({ ...s, site_name: e.target.value }))} placeholder="Nuvia Toon" />
+              <p className="text-xs text-muted-foreground mt-1">Shown across the homepage and SEO meta.</p>
+            </div>
+            <div>
+              <Label htmlFor="seo">SEO Description</Label>
+              <Textarea id="seo" rows={3} value={settings.seo_description} onChange={(e) => setSettings(s => ({ ...s, seo_description: e.target.value }))} />
+              <p className="text-xs text-muted-foreground mt-1">Used as the meta description on the homepage.</p>
+            </div>
+          </div>
+        </GlassCard>
+
+        <GlassCard title="Hero Banner Series" subtitle="Pick the headline series for the homepage hero">
+          <Select
+            value={settings.hero_series_id ?? "__none__"}
+            onValueChange={(v) => setSettings(s => ({ ...s, hero_series_id: v === "__none__" ? null : v }))}
+          >
+            <SelectTrigger><SelectValue placeholder="No hero" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">— None —</SelectItem>
+              {seriesList.map(s => (
+                <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-2">Saving will mark this series as the only Trending one.</p>
+        </GlassCard>
+
+        <Button onClick={save} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
+          <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save Settings"}
+        </Button>
+      </div>
+    </div>
+  );
+}
