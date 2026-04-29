@@ -3,6 +3,7 @@ import appCss from "../styles.css?url";
 import { AuthProvider } from "@/lib/auth";
 import { ThemeProvider } from "@/lib/theme";
 import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -56,6 +57,7 @@ function RootComponent() {
       <AuthProvider>
         <SiteHeader />
         <main className="pt-0"><Outlet /></main>
+        <SiteFooter />
         <Toaster richColors position="top-center" />
       </AuthProvider>
     </ThemeProvider>

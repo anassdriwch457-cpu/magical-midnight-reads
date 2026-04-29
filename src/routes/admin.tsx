@@ -16,7 +16,7 @@ import {
   Shield, Plus, Pencil, Trash2, Upload, ArrowLeft, BookOpen, Image as ImageIcon,
   BarChart3, Library, Users as UsersIcon, Coins, TrendingUp, Crown, Ban, CheckCircle2,
   Receipt, ArrowDownRight, ArrowUpRight, Settings as SettingsIcon, LayoutGrid, Rows3,
-  Sparkles, Flame, Save,
+  Sparkles, Flame, Save, CreditCard, ExternalLink, KeyRound,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -29,7 +29,7 @@ type Chapter = Tables<"chapters">;
 
 const ALL_GENRES = ["Action","Adventure","Comedy","Drama","Fantasy","Josei","Magic","Mystery","Romance","School Life","Shoujo","Shounen Ai","Supernatural","Yaoi","Yuri"];
 
-type Tab = "analytics" | "content" | "users" | "finance" | "settings";
+type Tab = "analytics" | "content" | "users" | "finance" | "payments" | "settings";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -47,6 +47,7 @@ function AdminPage() {
     if (canManageContent) t.push("content");
     if (canManageUsers) t.push("users");
     if (canViewAnalytics) t.push("finance");
+    if (isSuperAdmin || isManager) t.push("payments");
     if (isSuperAdmin || isManager) t.push("settings");
     return t;
   }, [canViewAnalytics, canManageContent, canManageUsers, isSuperAdmin, isManager]);
@@ -101,6 +102,7 @@ ON CONFLICT DO NOTHING;`}</code></pre>
           {tab === "content" && <ContentView />}
           {tab === "users" && <UsersView canEditRoles={isSuperAdmin} />}
           {tab === "finance" && <FinanceView />}
+          {tab === "payments" && <PaymentsView />}
           {tab === "settings" && <SettingsView />}
         </div>
       </div>
@@ -120,6 +122,7 @@ function AdminSidebar({ tab, setTab, allowedTabs, roleLabel }: {
     { key: "content", label: "Library", icon: Library },
     { key: "users", label: "Users", icon: UsersIcon },
     { key: "finance", label: "Finance", icon: Receipt },
+    { key: "payments", label: "Payments", icon: CreditCard },
     { key: "settings", label: "Settings", icon: SettingsIcon },
   ];
   return (
@@ -1367,6 +1370,90 @@ type SiteSettings = {
   seo_description: string;
   hero_series_id: string | null;
 };
+
+/* ---------------------- PAYMENTS & INTEGRATION ---------------------- */
+function PaymentsView() {
+  const tiers = [
+    { label: "Starter", price: "$0.99", coins: 100 },
+    { label: "Popular", price: "$4.99", coins: 550, badge: "Most Popular" },
+    { label: "Value", price: "$9.99", coins: 1400 },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-extrabold tracking-tight">Payments & Integration</h1>
+        <p className="text-sm text-muted-foreground mt-1">Stripe connection status, secrets, and live coin tiers.</p>
+      </div>
+
+      <div className="rounded-xl border border-border/60 bg-card/40 backdrop-blur-xl p-6 shadow-card">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex items-start gap-4">
+            <div className="rounded-xl bg-gradient-to-br from-primary to-primary/60 p-3 text-primary-foreground">
+              <CreditCard className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold">Stripe</h2>
+                <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+                  <CheckCircle2 className="h-3 w-3 mr-1" /> Connected
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+                Coin purchases run through Lovable's built-in Stripe integration.
+                A test environment is active by default — switch to live in your project's Payments settings when ready to charge real cards.
+              </p>
+            </div>
+          </div>
+          <Button asChild variant="outline" className="rounded-md">
+            <Link to="/topup"><ExternalLink className="h-4 w-4 mr-2" /> Test checkout</Link>
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border/60 bg-card/40 backdrop-blur-xl p-6 shadow-card">
+        <div className="flex items-center gap-2 mb-3">
+          <KeyRound className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-bold">API Keys & Secrets</h2>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          You don't need to paste Stripe keys manually — Lovable's built-in payments handle this automatically.
+          For custom integrations, store keys in <strong>Cloud → Secrets</strong> — never in code.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {[
+            { name: "STRIPE_PUBLIC_KEY", desc: "Safe to expose. Used to initialize Stripe.js on the client." },
+            { name: "STRIPE_SECRET_KEY", desc: "Server-only. Used to create Checkout sessions and verify webhooks." },
+          ].map(s => (
+            <div key={s.name} className="rounded-md border border-border bg-background/40 p-3">
+              <div className="font-mono text-xs font-bold">{s.name}</div>
+              <div className="text-xs text-muted-foreground mt-1">{s.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border/60 bg-card/40 backdrop-blur-xl p-6 shadow-card">
+        <h2 className="text-xl font-bold mb-1">Live Coin Tiers</h2>
+        <p className="text-sm text-muted-foreground mb-4">Active packages on the Buy Coins page.</p>
+        <div className="grid sm:grid-cols-3 gap-3">
+          {tiers.map(t => (
+            <div key={t.label} className={`relative rounded-lg border p-4 ${t.badge ? "border-primary bg-primary/5" : "border-border bg-background/40"}`}>
+              {t.badge && (
+                <div className="absolute -top-2 left-3 text-[10px] uppercase tracking-wider font-bold bg-primary text-primary-foreground px-2 py-0.5 rounded">
+                  {t.badge}
+                </div>
+              )}
+              <div className="text-xs uppercase tracking-wider text-muted-foreground font-bold">{t.label}</div>
+              <div className="text-2xl font-extrabold mt-1">{t.price}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{t.coins} coins</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SettingsView() {
   const [loading, setLoading] = useState(true);

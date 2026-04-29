@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Wallet { coins: number }
 
@@ -35,12 +36,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadUserData = async (uid: string) => {
-    const [{ data: w }, { data: r }] = await Promise.all([
-      supabase.from("wallets").select("coins").eq("user_id", uid).maybeSingle(),
-      supabase.from("user_roles").select("role").eq("user_id", uid),
-    ]);
-    setWallet(w ?? { coins: 0 });
-    setRoles((r ?? []).map((x) => x.role as Role));
+    try {
+      const [{ data: w }, { data: r }] = await Promise.all([
+        supabase.from("wallets").select("coins").eq("user_id", uid).maybeSingle(),
+        supabase.from("user_roles").select("role").eq("user_id", uid),
+      ]);
+      setWallet(w ?? { coins: 0 });
+      setRoles((r ?? []).map((x) => x.role as Role));
+    } catch (err) {
+      console.error("Failed to load user data", err);
+    }
   };
 
   useEffect(() => {
@@ -62,6 +67,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // Live wallet updates: instantly reflect coin balance changes.
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`wallet-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "wallets", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const next = (payload.new as { coins?: number } | null)?.coins;
+          if (typeof next === "number") {
+            setWallet((prev) => {
+              if (prev && next > prev.coins) {
+                toast.success(`+${next - prev.coins} coins`, { duration: 2200 });
+              }
+              return { coins: next };
+            });
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });

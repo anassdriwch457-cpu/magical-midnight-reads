@@ -7,6 +7,7 @@ import { LatestUpdateCard } from "@/components/latest-update-card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { GenreBar } from "@/components/genre-bar";
+import { SeriesCardSkeletonRow } from "@/components/series-card-skeleton";
 import { resolveImage, onImageError } from "@/lib/image";
 
 type Series = Tables<"series">;
@@ -28,9 +29,11 @@ function HomePage() {
   const [popular, setPopular] = useState<Series[]>([]);
   const [novels, setNovels] = useState<Series[]>([]);
   const [latest, setLatest] = useState<LatestEntry[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
+      try {
       const [t, p, n, l, settings] = await Promise.all([
         supabase.from("series").select("*").eq("is_trending", true).limit(5),
         supabase.from("series").select("*").eq("is_popular", true).eq("type", "manga").limit(12),
@@ -64,17 +67,34 @@ function HomePage() {
         });
         setLatest(seriesList.map((s) => ({ series: s, chapters: byId.get(s.id) ?? [] })));
       }
+      } catch (err) {
+        console.error("Failed to load homepage", err);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
   return (
     <div className="min-h-screen pb-20">
-      <Hero items={trending} />
+      <Hero items={trending} loading={loading} />
       <GenreBar />
       <div className="container mx-auto px-4 space-y-14 mt-10">
-        <LatestUpdatesSection items={latest} />
-        <Section title="Top Rated Manga" items={popular} />
-        <Section title="Latest Novels" items={novels} />
+        {loading ? (
+          <section>
+            <div className="flex items-center gap-3 mb-5">
+              <span className="block h-6 w-1 bg-primary rounded-sm" />
+              <h2 className="text-xl md:text-2xl font-extrabold tracking-tight uppercase">Loading…</h2>
+            </div>
+            <SeriesCardSkeletonRow count={12} />
+          </section>
+        ) : (
+          <>
+            <LatestUpdatesSection items={latest} />
+            <Section title="Top Rated Manga" items={popular} />
+            <Section title="Latest Novels" items={novels} />
+          </>
+        )}
       </div>
     </div>
   );
@@ -102,7 +122,7 @@ function LatestUpdatesSection({ items }: { items: LatestEntry[] }) {
   );
 }
 
-function Hero({ items }: { items: Series[] }) {
+function Hero({ items, loading }: { items: Series[]; loading?: boolean }) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
     if (items.length < 2) return;
@@ -111,7 +131,11 @@ function Hero({ items }: { items: Series[] }) {
   }, [items.length]);
 
   if (!items.length) {
-    return <div className="aspect-[21/9] w-full bg-card" />;
+    return (
+      <div className="relative aspect-[21/9] w-full min-h-[420px] bg-gradient-to-br from-card to-muted/40 overflow-hidden">
+        {loading && <div className="absolute inset-0 animate-pulse bg-muted/20" />}
+      </div>
+    );
   }
 
   const cur = items[idx];
