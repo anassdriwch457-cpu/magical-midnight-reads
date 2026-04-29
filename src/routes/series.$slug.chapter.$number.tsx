@@ -23,6 +23,7 @@ function ReaderPage() {
   const [series, setSeries] = useState<Series | null>(null);
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const [pages, setPages] = useState<Page[]>([]);
+  const [allChapters, setAllChapters] = useState<number[]>([]);
   const [siblings, setSiblings] = useState<{ prev?: number; next?: number }>({});
   const [unlocked, setUnlocked] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -41,6 +42,7 @@ function ReaderPage() {
 
     const { data: all } = await supabase.from("chapters").select("number").eq("series_id", s.id).order("number", { ascending: true });
     const nums = (all ?? []).map(x => Number(x.number));
+    setAllChapters(nums);
     const idx = nums.indexOf(Number(c.number));
     setSiblings({ prev: idx > 0 ? nums[idx - 1] : undefined, next: idx >= 0 && idx < nums.length - 1 ? nums[idx + 1] : undefined });
 
