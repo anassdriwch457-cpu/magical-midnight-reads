@@ -886,6 +886,8 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         </div>
       </div>
 
+      <MassPriceTool seriesId={seriesId} chapterCount={chapters.length} onDone={load} />
+
       <h3 className="font-bold uppercase tracking-wider text-sm mb-3">Chapters</h3>
       {chapters.length === 0 ? <p className="text-muted-foreground text-sm py-6 text-center">No chapters yet.</p> :
         <div className="rounded-md border border-border overflow-hidden">
