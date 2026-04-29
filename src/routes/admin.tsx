@@ -120,6 +120,7 @@ function AdminSidebar({ tab, setTab, allowedTabs, roleLabel }: {
     { key: "content", label: "Library", icon: Library },
     { key: "users", label: "Users", icon: UsersIcon },
     { key: "finance", label: "Finance", icon: Receipt },
+    { key: "settings", label: "Settings", icon: SettingsIcon },
   ];
   return (
     <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border/40 bg-card/30 backdrop-blur-xl min-h-[calc(100vh-5rem)] p-4 gap-1 supports-[backdrop-filter]:bg-card/20">
