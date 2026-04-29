@@ -15,6 +15,10 @@ const SORTS = [{ k: "latest", l: "Latest" }, { k: "popular", l: "Popular" }, { k
 
 export const Route = createFileRoute("/browse")({
   component: BrowsePage,
+  validateSearch: (s: Record<string, unknown>) => ({
+    q: typeof s.q === "string" ? s.q : "",
+    type: typeof s.type === "string" ? s.type : "all",
+  }),
   head: () => ({
     meta: [
       { title: "Browse — Nuvia Toon" },
@@ -24,7 +28,8 @@ export const Route = createFileRoute("/browse")({
 });
 
 function BrowsePage() {
-  const [type, setType] = useState<string>("all");
+  const search = Route.useSearch();
+  const [type, setType] = useState<string>(search.type ?? "all");
   const [status, setStatus] = useState<string>("all");
   const [genre, setGenre] = useState<string>("All");
   const [sort, setSort] = useState<string>("latest");
@@ -32,24 +37,28 @@ function BrowsePage() {
   const [items, setItems] = useState<Series[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const q = search.q?.trim() ?? "";
+
+  useEffect(() => { setType(search.type ?? "all"); setPage(0); }, [search.type, search.q]);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      let q = supabase.from("series").select("*", { count: "exact" });
-      if (type !== "all") q = q.eq("type", type as "manga" | "novel");
-      if (status !== "all") q = q.eq("status", status as "ongoing" | "completed" | "hiatus");
-      if (genre !== "All") q = q.contains("genres", [genre]);
-      if (sort === "latest") q = q.order("created_at", { ascending: false });
-      else if (sort === "popular") q = q.order("views", { ascending: false });
-      else if (sort === "title") q = q.order("title", { ascending: true });
+      let qb = supabase.from("series").select("*", { count: "exact" });
+      if (type !== "all") qb = qb.eq("type", type as "manga" | "novel");
+      if (status !== "all") qb = qb.eq("status", status as "ongoing" | "completed" | "hiatus");
+      if (genre !== "All") qb = qb.contains("genres", [genre]);
+      if (q) qb = qb.ilike("title", `%${q}%`);
+      if (sort === "latest") qb = qb.order("created_at", { ascending: false });
+      else if (sort === "popular") qb = qb.order("views", { ascending: false });
+      else if (sort === "title") qb = qb.order("title", { ascending: true });
       const from = page * PAGE_SIZE;
-      const { data, count: c } = await q.range(from, from + PAGE_SIZE - 1);
+      const { data, count: c } = await qb.range(from, from + PAGE_SIZE - 1);
       setItems(data ?? []);
       setCount(c ?? 0);
       setLoading(false);
     })();
-  }, [type, status, genre, sort, page]);
+  }, [type, status, genre, sort, page, q]);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(count / PAGE_SIZE)), [count]);
   const reset = (fn: () => void) => { fn(); setPage(0); };
