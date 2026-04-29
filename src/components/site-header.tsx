@@ -102,6 +102,61 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <div ref={searchRef} className="relative hidden md:block">
+            <div className="flex items-center bg-white/10 hover:bg-white/15 focus-within:bg-white/20 rounded-full transition-colors w-56 lg:w-72">
+              <Search className="h-4 w-4 text-white/70 ml-3" />
+              <input
+                value={query}
+                onChange={(e) => { setQuery(e.target.value); setSearchOpen(true); }}
+                onFocus={() => setSearchOpen(true)}
+                onKeyDown={(e) => { if (e.key === "Enter") submitSearch(query); if (e.key === "Escape") setSearchOpen(false); }}
+                placeholder="Search series…"
+                className="bg-transparent text-sm text-white placeholder:text-white/50 px-2 py-2 flex-1 outline-none"
+              />
+              {query && (
+                <button onClick={() => { setQuery(""); setHits([]); }} className="mr-2 text-white/60 hover:text-white" aria-label="Clear">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {searchOpen && query.trim().length >= 2 && (
+              <div className="absolute top-full mt-2 left-0 right-0 rounded-lg border border-border bg-popover shadow-xl overflow-hidden z-50">
+                {searching && hits.length === 0 ? (
+                  <div className="px-3 py-4 text-sm text-muted-foreground">Searching…</div>
+                ) : hits.length === 0 ? (
+                  <div className="px-3 py-4 text-sm text-muted-foreground">No matches for "{query}"</div>
+                ) : (
+                  <>
+                    <ul className="max-h-80 overflow-auto">
+                      {hits.map((h) => (
+                        <li key={h.id}>
+                          <Link
+                            to="/series/$slug"
+                            params={{ slug: h.slug }}
+                            onClick={() => { setSearchOpen(false); setQuery(""); }}
+                            className="flex items-center gap-3 px-3 py-2 hover:bg-muted/60 transition-colors"
+                          >
+                            <img src={h.cover_url ?? ""} alt="" className="h-10 w-7 object-cover rounded bg-muted shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold truncate">{h.title}</div>
+                              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{h.type}</div>
+                            </div>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      onClick={() => submitSearch(query)}
+                      className="w-full text-left px-3 py-2 border-t border-border text-xs font-bold uppercase tracking-wider text-primary hover:bg-muted/60"
+                    >
+                      See all results for "{query}" →
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Theme" className="text-white hover:text-primary hover:bg-white/10">
