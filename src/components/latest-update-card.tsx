@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Coins } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { resolveImage, onImageError } from "@/lib/image";
 
 type Series = Pick<Tables<"series">, "id" | "slug" | "title" | "cover_url" | "type">;
 type Chapter = Pick<Tables<"chapters">, "id" | "number" | "price" | "created_at">;
