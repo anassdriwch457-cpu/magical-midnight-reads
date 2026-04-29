@@ -2,12 +2,13 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { Home, Compass, BookOpen, Coins, User } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
-const ITEMS = [
+type NavItem = { to: "/" | "/browse" | "/topup"; label: string; icon: typeof Home; exact?: boolean };
+const ITEMS: NavItem[] = [
   { to: "/", label: "Home", icon: Home, exact: true },
   { to: "/browse", label: "Browse", icon: Compass },
-  { to: "/browse", label: "Manga", icon: BookOpen, search: { type: "manga" } },
+  { to: "/browse", label: "Manga", icon: BookOpen },
   { to: "/topup", label: "Coins", icon: Coins },
-] as const;
+];
 
 export function MobileNav() {
   const { pathname } = useLocation();
