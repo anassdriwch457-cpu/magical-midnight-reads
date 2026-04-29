@@ -55,7 +55,7 @@ function RootComponent() {
     <ThemeProvider>
       <AuthProvider>
         <SiteHeader />
-        <main><Outlet /></main>
+        <main className="pt-0"><Outlet /></main>
         <Toaster richColors position="top-center" />
       </AuthProvider>
     </ThemeProvider>
