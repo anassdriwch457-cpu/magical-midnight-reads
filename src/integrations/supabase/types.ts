@@ -260,15 +260,35 @@ export type Database = {
         Args: { _delta: number; _reason?: string; _target: string }
         Returns: Json
       }
+      admin_finance_log: {
+        Args: { _limit?: number }
+        Returns: {
+          amount: number
+          kind: string
+          note: string
+          occurred_at: string
+          user_email: string
+          user_id: string
+        }[]
+      }
       admin_list_users: {
         Args: never
         Returns: {
+          banned_until: string
           coins: number
           created_at: string
           display_name: string
           email: string
           id: string
           roles: string[]
+        }[]
+      }
+      admin_revenue_daily: {
+        Args: { _days?: number }
+        Returns: {
+          day: string
+          revenue: number
+          unlocks: number
         }[]
       }
       admin_set_user_role: {

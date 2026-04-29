@@ -1,8 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import { setUserBan } from "@/server/admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,8 +14,12 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Shield, Plus, Pencil, Trash2, Upload, ArrowLeft, BookOpen, Image as ImageIcon,
-  BarChart3, Library, Users as UsersIcon, Coins, TrendingUp, Crown,
+  BarChart3, Library, Users as UsersIcon, Coins, TrendingUp, Crown, Ban, CheckCircle2,
+  Receipt, ArrowDownRight, ArrowUpRight,
 } from "lucide-react";
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+} from "recharts";
 import { toast } from "sonner";
 import JSZip from "jszip";
 
@@ -22,7 +28,7 @@ type Chapter = Tables<"chapters">;
 
 const ALL_GENRES = ["Action","Adventure","Comedy","Drama","Fantasy","Josei","Magic","Mystery","Romance","School Life","Shoujo","Shounen Ai","Supernatural","Yaoi","Yuri"];
 
-type Tab = "analytics" | "content" | "users";
+type Tab = "analytics" | "content" | "users" | "finance";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -39,6 +45,7 @@ function AdminPage() {
     if (canViewAnalytics) t.push("analytics");
     if (canManageContent) t.push("content");
     if (canManageUsers) t.push("users");
+    if (canViewAnalytics) t.push("finance");
     return t;
   }, [canViewAnalytics, canManageContent, canManageUsers]);
 
@@ -78,7 +85,7 @@ ON CONFLICT DO NOTHING;`}</code></pre>
   );
 
   return (
-    <div className="pt-20 min-h-screen bg-background">
+    <div className="pt-20 min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <div className="flex">
         <AdminSidebar
           tab={tab}
@@ -91,6 +98,7 @@ ON CONFLICT DO NOTHING;`}</code></pre>
           {tab === "analytics" && <AnalyticsView />}
           {tab === "content" && <ContentView />}
           {tab === "users" && <UsersView canEditRoles={isSuperAdmin} />}
+          {tab === "finance" && <FinanceView />}
         </div>
       </div>
     </div>
@@ -105,17 +113,18 @@ function AdminSidebar({ tab, setTab, allowedTabs, roleLabel }: {
   roleLabel: string;
 }) {
   const items: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
-    { key: "analytics", label: "Analytics", icon: BarChart3 },
-    { key: "content", label: "Content", icon: Library },
+    { key: "analytics", label: "Dashboard", icon: BarChart3 },
+    { key: "content", label: "Library", icon: Library },
     { key: "users", label: "Users", icon: UsersIcon },
+    { key: "finance", label: "Finance", icon: Receipt },
   ];
   return (
-    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-card/40 min-h-[calc(100vh-5rem)] p-4 gap-1">
-      <div className="px-3 py-4 mb-2 border-b border-border">
+    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border/40 bg-card/30 backdrop-blur-xl min-h-[calc(100vh-5rem)] p-4 gap-1 supports-[backdrop-filter]:bg-card/20">
+      <div className="px-3 py-4 mb-2 border-b border-border/40">
         <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
           <Crown className="h-3.5 w-3.5 text-primary" /> {roleLabel}
         </div>
-        <div className="mt-1 text-lg font-extrabold tracking-tight">Dashboard</div>
+        <div className="mt-1 text-lg font-extrabold tracking-tight bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">Control Center</div>
       </div>
       {items.filter(i => allowedTabs.includes(i.key)).map(({ key, label, icon: Icon }) => {
         const active = tab === key;
@@ -123,9 +132,9 @@ function AdminSidebar({ tab, setTab, allowedTabs, roleLabel }: {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-semibold transition-colors text-left ${
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-semibold transition-all text-left ${
               active
-                ? "bg-primary text-primary-foreground"
+                ? "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg shadow-primary/20"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             }`}
           >
@@ -152,97 +161,166 @@ function MobileTabs({ tab, setTab, allowedTabs }: { tab: Tab | null; setTab: (t:
   );
 }
 
-/* ---------------------- ANALYTICS ---------------------- */
+/* ---------------------- ANALYTICS / DASHBOARD ---------------------- */
+type RevenueDay = { day: string; revenue: number; unlocks: number };
+type GrowthDay = { day: string; signups: number };
+
 function AnalyticsView() {
   const [totalSales, setTotalSales] = useState<number | null>(null);
   const [topSeries, setTopSeries] = useState<{ series_id: string; title: string; cover_url: string | null; unlocks: number; revenue: number }[]>([]);
-  const [growth7, setGrowth7] = useState<number>(0);
-  const [growth30, setGrowth30] = useState<number>(0);
-  const [growthSeries, setGrowthSeries] = useState<{ day: string; signups: number }[]>([]);
+  const [growth7, setGrowth7] = useState(0);
+  const [growth30, setGrowth30] = useState(0);
+  const [growthSeries, setGrowthSeries] = useState<GrowthDay[]>([]);
+  const [revenueSeries, setRevenueSeries] = useState<RevenueDay[]>([]);
+  const [revenue7, setRevenue7] = useState(0);
+  const [unlocks7, setUnlocks7] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [sales, top, growth] = await Promise.all([
+      const [sales, top, growth, revenue] = await Promise.all([
         supabase.rpc("admin_total_sales"),
         supabase.rpc("admin_top_series", { _limit: 10 }),
         supabase.rpc("admin_user_growth", { _days: 30 }),
+        supabase.rpc("admin_revenue_daily", { _days: 30 }),
       ]);
       if (sales.error) toast.error(sales.error.message); else setTotalSales(Number(sales.data ?? 0));
       if (top.error) toast.error(top.error.message); else setTopSeries((top.data ?? []) as never);
       if (growth.error) toast.error(growth.error.message);
       else {
-        const days = (growth.data ?? []) as { day: string; signups: number }[];
+        const days = ((growth.data ?? []) as GrowthDay[]).map(d => ({ ...d, signups: Number(d.signups) }));
         setGrowthSeries(days);
-        setGrowth30(days.reduce((a, d) => a + Number(d.signups), 0));
-        setGrowth7(days.slice(-7).reduce((a, d) => a + Number(d.signups), 0));
+        setGrowth30(days.reduce((a, d) => a + d.signups, 0));
+        setGrowth7(days.slice(-7).reduce((a, d) => a + d.signups, 0));
+      }
+      if (revenue.error) toast.error(revenue.error.message);
+      else {
+        const days = ((revenue.data ?? []) as RevenueDay[]).map(d => ({
+          ...d,
+          revenue: Number(d.revenue),
+          unlocks: Number(d.unlocks),
+        }));
+        setRevenueSeries(days);
+        const last7 = days.slice(-7);
+        setRevenue7(last7.reduce((a, d) => a + d.revenue, 0));
+        setUnlocks7(last7.reduce((a, d) => a + d.unlocks, 0));
       }
       setLoading(false);
     })();
   }, []);
 
-  if (loading) return <p className="text-muted-foreground">Loading analytics…</p>;
+  if (loading) return <p className="text-muted-foreground">Loading dashboard…</p>;
 
-  const maxBar = Math.max(1, ...growthSeries.map(d => Number(d.signups)));
+  // merge growth & revenue by day for combined chart
+  const combined = revenueSeries.map((r) => {
+    const g = growthSeries.find((s) => s.day === r.day);
+    return {
+      day: r.day.slice(5), // MM-DD
+      revenue: r.revenue,
+      unlocks: r.unlocks,
+      signups: g ? g.signups : 0,
+    };
+  });
 
   return (
     <div>
-      <SectionHeader icon={BarChart3} title="Analytics" subtitle="Sales, top content, and growth" />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <StatCard icon={Coins} label="Total Coins Spent" value={totalSales?.toLocaleString() ?? "0"} accent />
-        <StatCard icon={TrendingUp} label="New Users (7d)" value={growth7.toLocaleString()} />
-        <StatCard icon={UsersIcon} label="New Users (30d)" value={growth30.toLocaleString()} />
+      <SectionHeader icon={BarChart3} title="Dashboard" subtitle="Real-time revenue, growth, and engagement" />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <StatCard icon={Coins} label="Revenue (7d)" value={`${revenue7.toLocaleString()} ¢`} accent />
+        <StatCard icon={BookOpen} label="Unlocks (7d)" value={unlocks7.toLocaleString()} />
+        <StatCard icon={UsersIcon} label="New Users (7d)" value={growth7.toLocaleString()} />
+        <StatCard icon={TrendingUp} label="All-time Coins" value={totalSales?.toLocaleString() ?? "0"} />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="rounded-lg border border-border bg-card p-5">
-          <h3 className="font-bold uppercase tracking-wider text-sm mb-4">Top Series by Unlocks</h3>
-          {topSeries.length === 0 ? <p className="text-sm text-muted-foreground">No unlocks yet.</p> :
-            <ol className="space-y-3">
-              {topSeries.map((s, i) => (
-                <li key={s.series_id} className="flex items-center gap-3">
-                  <span className="text-xs font-mono text-muted-foreground w-5">{i + 1}</span>
-                  {s.cover_url
-                    ? <img src={s.cover_url} alt="" className="h-10 w-7 object-cover rounded-sm" />
-                    : <div className="h-10 w-7 rounded-sm bg-muted" />}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold truncate">{s.title}</div>
-                    <div className="text-xs text-muted-foreground">{Number(s.unlocks)} unlocks · {Number(s.revenue).toLocaleString()} coins</div>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          }
-        </div>
+      <div className="grid lg:grid-cols-2 gap-6 mb-6">
+        <GlassCard title="Revenue (last 30 days)" subtitle={`${revenue30Total(revenueSeries).toLocaleString()} coins total`}>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={combined} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.55} />
+                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+              <Tooltip contentStyle={chartTooltip} cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }} />
+              <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#revFill)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </GlassCard>
 
-        <div className="rounded-lg border border-border bg-card p-5">
-          <h3 className="font-bold uppercase tracking-wider text-sm mb-4">Sign-ups (last 30 days)</h3>
-          <div className="flex items-end gap-1 h-40">
-            {growthSeries.map(d => (
-              <div key={d.day} className="flex-1 flex flex-col items-center gap-1" title={`${d.day}: ${d.signups}`}>
-                <div
-                  className="w-full bg-primary/80 rounded-sm"
-                  style={{ height: `${(Number(d.signups) / maxBar) * 100}%`, minHeight: 2 }}
-                />
-              </div>
+        <GlassCard title="Growth & Unlocks (30d)" subtitle="Signups vs chapter unlocks">
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={combined} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+              <Tooltip contentStyle={chartTooltip} cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }} />
+              <Bar dataKey="signups" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="unlocks" fill="hsl(var(--muted-foreground))" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-primary inline-block" /> Signups</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-muted-foreground inline-block" /> Unlocks</span>
+          </div>
+        </GlassCard>
+      </div>
+
+      <GlassCard title="Top Series by Unlocks">
+        {topSeries.length === 0 ? <p className="text-sm text-muted-foreground">No unlocks yet.</p> :
+          <ol className="space-y-3">
+            {topSeries.map((s, i) => (
+              <li key={s.series_id} className="flex items-center gap-3">
+                <span className="text-xs font-mono text-muted-foreground w-5">{i + 1}</span>
+                {s.cover_url
+                  ? <img src={s.cover_url} alt="" className="h-10 w-7 object-cover rounded-sm" />
+                  : <div className="h-10 w-7 rounded-sm bg-muted" />}
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold truncate">{s.title}</div>
+                  <div className="text-xs text-muted-foreground">{Number(s.unlocks)} unlocks · {Number(s.revenue).toLocaleString()} coins</div>
+                </div>
+              </li>
             ))}
-          </div>
-          <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
-            <span>{growthSeries[0]?.day.slice(5)}</span>
-            <span>{growthSeries.at(-1)?.day.slice(5)}</span>
-          </div>
-        </div>
+          </ol>
+        }
+      </GlassCard>
+    </div>
+  );
+}
+
+const chartTooltip = {
+  background: "hsl(var(--card))",
+  border: "1px solid hsl(var(--border))",
+  borderRadius: 6,
+  fontSize: 12,
+};
+
+function revenue30Total(days: RevenueDay[]) {
+  return days.reduce((a, d) => a + Number(d.revenue), 0);
+}
+
+function GlassCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-xl p-5 shadow-xl shadow-black/5">
+      <div className="mb-4">
+        <h3 className="font-bold uppercase tracking-wider text-sm">{title}</h3>
+        {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
       </div>
+      {children}
     </div>
   );
 }
 
 function StatCard({ icon: Icon, label, value, accent }: { icon: typeof Coins; label: string; value: string; accent?: boolean }) {
   return (
-    <div className={`rounded-lg border p-5 ${accent ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
+    <div className={`rounded-xl border backdrop-blur-xl p-5 shadow-lg transition-all hover:scale-[1.02] ${accent ? "border-primary/40 bg-gradient-to-br from-primary/10 to-primary/5 shadow-primary/10" : "border-border/50 bg-card/40 shadow-black/5"}`}>
       <div className="flex items-center justify-between">
-        <span className="text-xs uppercase tracking-widest text-muted-foreground">{label}</span>
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{label}</span>
         <Icon className={`h-4 w-4 ${accent ? "text-primary" : "text-muted-foreground"}`} />
       </div>
       <div className={`mt-2 text-2xl font-extrabold tabular-nums ${accent ? "text-primary" : ""}`}>{value}</div>
@@ -739,6 +817,7 @@ type AdminUser = {
   coins: number;
   created_at: string;
   roles: string[];
+  banned_until: string | null;
 };
 
 const ROLES_EDITABLE: { key: "admin" | "manager" | "super_admin"; label: string }[] = [
@@ -747,10 +826,16 @@ const ROLES_EDITABLE: { key: "admin" | "manager" | "super_admin"; label: string 
   { key: "super_admin", label: "Super-Admin" },
 ];
 
+function isBanned(u: { banned_until: string | null }): boolean {
+  if (!u.banned_until) return false;
+  return new Date(u.banned_until).getTime() > Date.now();
+}
+
 function UsersView({ canEditRoles }: { canEditRoles: boolean }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filterRole, setFilterRole] = useState<"all" | "staff" | "banned">("all");
   const [selected, setSelected] = useState<AdminUser | null>(null);
 
   const load = async () => {
@@ -764,60 +849,90 @@ function UsersView({ canEditRoles }: { canEditRoles: boolean }) {
 
   const filtered = users.filter(u => {
     const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return u.email.toLowerCase().includes(q) || (u.display_name ?? "").toLowerCase().includes(q);
+    if (q && !u.email.toLowerCase().includes(q) && !(u.display_name ?? "").toLowerCase().includes(q)) return false;
+    if (filterRole === "staff" && u.roles.length === 0) return false;
+    if (filterRole === "banned" && !isBanned(u)) return false;
+    return true;
   });
+
+  const stats = useMemo(() => ({
+    total: users.length,
+    staff: users.filter(u => u.roles.length > 0).length,
+    banned: users.filter(isBanned).length,
+  }), [users]);
 
   return (
     <div>
-      <SectionHeader icon={UsersIcon} title="Users" subtitle={`${users.length} total`} />
+      <SectionHeader icon={UsersIcon} title="Users" subtitle={`${stats.total} total · ${stats.staff} staff · ${stats.banned} banned`} />
 
-      <Input
-        placeholder="Search by email or display name…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-sm mb-5"
-      />
+      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        <Input
+          placeholder="Search by email or display name…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
+        <Select value={filterRole} onValueChange={(v) => setFilterRole(v as typeof filterRole)}>
+          <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All users</SelectItem>
+            <SelectItem value="staff">Staff only</SelectItem>
+            <SelectItem value="banned">Banned only</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {loading ? <p className="text-muted-foreground py-8 text-center">Loading…</p> :
-        <div className="rounded-md border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-card text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="text-left px-4 py-3">User</th>
-                <th className="text-left px-4 py-3 hidden md:table-cell">Roles</th>
-                <th className="text-left px-4 py-3 w-28">Coins</th>
-                <th className="text-left px-4 py-3 hidden md:table-cell w-32">Joined</th>
-                <th className="text-right px-4 py-3 w-28">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(u => (
-                <tr key={u.id} className="border-t border-border hover:bg-card/50">
-                  <td className="px-4 py-3">
-                    <div className="font-bold">{u.display_name || u.email.split("@")[0]}</div>
-                    <div className="text-xs text-muted-foreground">{u.email}</div>
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    <div className="flex flex-wrap gap-1">
-                      {u.roles.length === 0 ? <span className="text-xs text-muted-foreground">user</span> :
-                        u.roles.map(r => <Badge key={r} variant="outline" className="text-[10px]">{r}</Badge>)}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-bold tabular-nums">
-                    <span className="inline-flex items-center gap-1"><Coins className="h-3.5 w-3.5 text-primary" /> {u.coins}</span>
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-right">
-                    <Button size="sm" variant="outline" onClick={() => setSelected(u)}>Manage</Button>
-                  </td>
+        <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-xl overflow-hidden shadow-xl shadow-black/5">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="text-left px-4 py-3">User</th>
+                  <th className="text-left px-4 py-3 hidden md:table-cell">Roles</th>
+                  <th className="text-left px-4 py-3 w-28">Coins</th>
+                  <th className="text-left px-4 py-3 hidden lg:table-cell w-32">Joined</th>
+                  <th className="text-right px-4 py-3 w-28">Action</th>
                 </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No users match your search.</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map(u => {
+                  const banned = isBanned(u);
+                  return (
+                    <tr key={u.id} className={`border-t border-border/40 hover:bg-card/60 transition-colors ${banned ? "opacity-60" : ""}`}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <div className="font-bold flex items-center gap-2">
+                              {u.display_name || u.email.split("@")[0]}
+                              {banned && <Badge variant="destructive" className="text-[9px] uppercase">Banned</Badge>}
+                            </div>
+                            <div className="text-xs text-muted-foreground">{u.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <div className="flex flex-wrap gap-1">
+                          {u.roles.length === 0 ? <span className="text-xs text-muted-foreground">user</span> :
+                            u.roles.map(r => <Badge key={r} variant="outline" className="text-[10px] border-primary/40 text-primary">{r}</Badge>)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-bold tabular-nums">
+                        <span className="inline-flex items-center gap-1"><Coins className="h-3.5 w-3.5 text-primary" /> {u.coins}</span>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" variant="outline" onClick={() => setSelected(u)}>Manage</Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No users match your filters.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       }
 
@@ -844,6 +959,8 @@ function UserModal({ user, canEditRoles, onClose, onChanged }: {
   const [busy, setBusy] = useState(false);
   const [roles, setRoles] = useState<string[]>(user.roles);
   const [coins, setCoins] = useState(user.coins);
+  const [banned, setBanned] = useState(isBanned(user));
+  const banFn = useServerFn(setUserBan);
 
   const adjust = async () => {
     const d = parseInt(delta);
@@ -874,15 +991,36 @@ function UserModal({ user, canEditRoles, onClose, onChanged }: {
     onChanged();
   };
 
+  const toggleBan = async () => {
+    const next = !banned;
+    if (next && !confirm(`Ban ${user.email}? They will be signed out and unable to log back in.`)) return;
+    setBusy(true);
+    try {
+      await banFn({ data: { targetUserId: user.id, ban: next } });
+      setBanned(next);
+      toast.success(next ? "User banned" : "User unbanned");
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-card border border-border rounded-lg max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-5">
-          <h3 className="text-lg font-bold">{user.display_name || user.email.split("@")[0]}</h3>
-          <p className="text-xs text-muted-foreground">{user.email}</p>
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card/95 backdrop-blur-xl border border-border/50 rounded-xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              {user.display_name || user.email.split("@")[0]}
+              {banned && <Badge variant="destructive" className="text-[10px]">Banned</Badge>}
+            </h3>
+            <p className="text-xs text-muted-foreground">{user.email}</p>
+          </div>
         </div>
 
-        <div className="rounded-md bg-primary/5 border border-primary/30 p-4 mb-5">
+        <div className="rounded-md bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/30 p-4 mb-5">
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Current balance</div>
           <div className="text-2xl font-extrabold text-primary tabular-nums">{coins.toLocaleString()} coins</div>
         </div>
@@ -902,13 +1040,13 @@ function UserModal({ user, canEditRoles, onClose, onChanged }: {
         </div>
 
         {canEditRoles && (
-          <div className="mt-6 border-t border-border pt-5">
+          <div className="mt-6 border-t border-border/40 pt-5">
             <Label className="mb-2 block">Roles</Label>
             <div className="space-y-2">
               {ROLES_EDITABLE.map(r => {
                 const on = roles.includes(r.key);
                 return (
-                  <div key={r.key} className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2">
+                  <div key={r.key} className="flex items-center justify-between rounded-md border border-border/50 bg-background/60 px-3 py-2">
                     <div>
                       <div className="text-sm font-bold">{r.label}</div>
                       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{r.key}</div>
@@ -928,10 +1066,137 @@ function UserModal({ user, canEditRoles, onClose, onChanged }: {
           </div>
         )}
 
+        <div className="mt-6 border-t border-border/40 pt-5">
+          <Label className="mb-2 block">Account access</Label>
+          <Button
+            onClick={toggleBan}
+            disabled={busy}
+            variant={banned ? "outline" : "destructive"}
+            className="w-full font-bold"
+          >
+            {banned ? <><CheckCircle2 className="h-4 w-4" /> Unban User</> : <><Ban className="h-4 w-4" /> Ban User</>}
+          </Button>
+          <p className="text-[11px] text-muted-foreground mt-2">
+            {banned
+              ? "Banned users cannot sign in or use existing sessions. Unban to restore access."
+              : "Banning prevents sign-in and invalidates all existing sessions immediately."}
+          </p>
+        </div>
+
         <div className="mt-6 flex justify-end">
           <Button variant="outline" onClick={onClose}>Close</Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------------------- FINANCE LOG ---------------------- */
+type FinanceRow = {
+  occurred_at: string;
+  kind: "unlock" | "adjustment";
+  user_id: string;
+  user_email: string | null;
+  amount: number;
+  note: string;
+};
+
+function FinanceView() {
+  const [rows, setRows] = useState<FinanceRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "unlock" | "adjustment">("all");
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data, error } = await supabase.rpc("admin_finance_log", { _limit: 200 });
+      if (error) toast.error(error.message);
+      setRows((data ?? []) as FinanceRow[]);
+      setLoading(false);
+    })();
+  }, []);
+
+  const filtered = rows.filter(r => {
+    if (filter !== "all" && r.kind !== filter) return false;
+    const q = search.trim().toLowerCase();
+    if (q && !(r.user_email ?? "").toLowerCase().includes(q) && !r.note.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const totals = useMemo(() => {
+    const spent = rows.filter(r => r.kind === "unlock").reduce((a, r) => a + Math.abs(r.amount), 0);
+    const granted = rows.filter(r => r.kind === "adjustment" && r.amount > 0).reduce((a, r) => a + r.amount, 0);
+    const removed = rows.filter(r => r.kind === "adjustment" && r.amount < 0).reduce((a, r) => a + Math.abs(r.amount), 0);
+    return { spent, granted, removed };
+  }, [rows]);
+
+  return (
+    <div>
+      <SectionHeader icon={Receipt} title="Finance Log" subtitle={`Latest ${rows.length} transactions`} />
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <StatCard icon={Coins} label="Coins Spent" value={totals.spent.toLocaleString()} accent />
+        <StatCard icon={ArrowUpRight} label="Granted by Staff" value={totals.granted.toLocaleString()} />
+        <StatCard icon={ArrowDownRight} label="Removed by Staff" value={totals.removed.toLocaleString()} />
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        <Input
+          placeholder="Search email or note…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
+        <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
+          <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All transactions</SelectItem>
+            <SelectItem value="unlock">Chapter unlocks</SelectItem>
+            <SelectItem value="adjustment">Admin adjustments</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {loading ? <p className="text-muted-foreground py-8 text-center">Loading…</p> :
+        <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-xl overflow-hidden shadow-xl shadow-black/5">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="text-left px-4 py-3 w-36 hidden sm:table-cell">When</th>
+                  <th className="text-left px-4 py-3">User</th>
+                  <th className="text-left px-4 py-3 hidden md:table-cell">Detail</th>
+                  <th className="text-right px-4 py-3 w-28">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((r, i) => (
+                  <tr key={i} className="border-t border-border/40 hover:bg-card/60 transition-colors">
+                    <td className="px-4 py-3 hidden sm:table-cell text-xs text-muted-foreground tabular-nums">
+                      {new Date(r.occurred_at).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-xs font-mono truncate max-w-[180px]">{r.user_email ?? r.user_id.slice(0, 8)}</div>
+                      <div className="md:hidden text-[10px] text-muted-foreground truncate max-w-[180px]">{r.note}</div>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell text-xs">
+                      <Badge variant="outline" className="mr-2 text-[9px] uppercase">{r.kind}</Badge>
+                      <span className="text-muted-foreground">{r.note}</span>
+                    </td>
+                    <td className={`px-4 py-3 text-right font-bold tabular-nums ${r.amount < 0 ? "text-destructive" : "text-primary"}`}>
+                      {r.amount > 0 ? "+" : ""}{r.amount.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No transactions match your filters.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
     </div>
   );
 }
