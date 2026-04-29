@@ -39,23 +39,29 @@ function applyAccent(hex: string) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const { l, c, h } = hexToOklch(hex);
-  // Tame chroma for a premium, easy-on-the-eyes feel
-  const cc = Math.min(c, 0.20);
-  const base = `${l.toFixed(3)} ${cc.toFixed(3)} ${h.toFixed(2)}`;
-  const soft = `${Math.min(0.78, l + 0.12).toFixed(3)} ${(cc * 0.85).toFixed(3)} ${((h + 30) % 360).toFixed(2)}`;
+  // Floor lightness so very dark accents stay visible on dark bg, but cap chroma for readability
+  const baseL = Math.max(0.55, Math.min(0.78, l));
+  const cc = Math.min(c, 0.22);
+  const base = `${baseL.toFixed(3)} ${cc.toFixed(3)} ${h.toFixed(2)}`;
+  const softL = Math.min(0.82, baseL + 0.10);
+  const soft = `${softL.toFixed(3)} ${(cc * 0.9).toFixed(3)} ${((h + 25) % 360).toFixed(2)}`;
+  // Auto-pick legible foreground for primary surfaces (buttons): dark text on light accent, light text on dark accent
+  const fg = baseL >= 0.62 ? "oklch(0.10 0.005 270)" : "oklch(0.98 0.005 270)";
   root.style.setProperty("--primary", `oklch(${base})`);
+  root.style.setProperty("--primary-foreground", fg);
   root.style.setProperty("--accent", `oklch(${soft})`);
+  root.style.setProperty("--accent-foreground", fg);
   root.style.setProperty("--ring", `oklch(${base})`);
   root.style.setProperty("--neon-purple", `oklch(${base})`);
   root.style.setProperty("--neon-pink", `oklch(${soft})`);
   root.style.setProperty("--gradient-brand", `linear-gradient(135deg, oklch(${base}) 0%, oklch(${soft}) 100%)`);
-  root.style.setProperty("--shadow-glow", `0 0 28px oklch(${base} / 0.22)`);
+  root.style.setProperty("--shadow-glow", `0 0 24px oklch(${base} / 0.28)`);
 }
 
 function clearAccent() {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  ["--primary","--accent","--ring","--neon-purple","--neon-pink","--gradient-brand","--shadow-glow"].forEach(p =>
+  ["--primary","--primary-foreground","--accent","--accent-foreground","--ring","--neon-purple","--neon-pink","--gradient-brand","--shadow-glow"].forEach(p =>
     root.style.removeProperty(p)
   );
 }

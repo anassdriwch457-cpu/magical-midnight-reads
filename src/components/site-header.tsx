@@ -47,12 +47,12 @@ export function SiteHeader() {
           </div>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-7 text-[13px] font-bold tracking-wider">
+        <nav className="hidden md:flex items-center gap-7 text-[13px] font-extrabold tracking-wider">
           {NAV.map((n) => (
             <Link
               key={n.label}
               to={n.to}
-              className="text-white/80 hover:text-primary transition-colors"
+              className="text-white hover:text-primary transition-colors drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
               activeProps={{ className: "text-primary" }}
               activeOptions={{ exact: true }}
             >
@@ -64,8 +64,8 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Theme" className="text-white/80 hover:text-white hover:bg-white/10">
-                {theme === "magic" ? <Sparkles className="h-4 w-4" /> : theme === "midnight" ? <Moon className="h-4 w-4" /> : theme === "concrete" ? <Square className="h-4 w-4" /> : <Palette className="h-4 w-4" style={{ color: accent }} />}
+              <Button variant="ghost" size="icon" aria-label="Theme" className="text-white hover:text-primary hover:bg-white/10">
+                {theme === "magic" ? <Sparkles className="h-[18px] w-[18px]" /> : theme === "midnight" ? <Moon className="h-[18px] w-[18px]" /> : theme === "concrete" ? <Square className="h-[18px] w-[18px]" /> : <Palette className="h-[18px] w-[18px]" style={{ color: accent }} />}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-60">
@@ -108,7 +108,7 @@ export function SiteHeader() {
               </Link>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10"><User className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-white/10"><User className="h-[18px] w-[18px]" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
@@ -121,7 +121,10 @@ export function SiteHeader() {
               </DropdownMenu>
             </>
           ) : (
-            <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-[4px]">
+            <Button
+              asChild
+              className="bg-primary !text-white hover:bg-primary/90 font-extrabold rounded-[4px] tracking-wider ring-1 ring-white/20 shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
+            >
               <Link to="/auth">SIGN IN</Link>
             </Button>
           )}
