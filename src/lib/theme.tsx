@@ -39,16 +39,17 @@ function applyAccent(hex: string) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const { l, c, h } = hexToOklch(hex);
-  // Build complementary tones from the accent
-  const base = `${l.toFixed(3)} ${c.toFixed(3)} ${h.toFixed(2)}`;
-  const lighter = `${Math.min(0.85, l + 0.1).toFixed(3)} ${c.toFixed(3)} ${((h + 20) % 360).toFixed(2)}`;
+  // Tame chroma for a premium, easy-on-the-eyes feel
+  const cc = Math.min(c, 0.20);
+  const base = `${l.toFixed(3)} ${cc.toFixed(3)} ${h.toFixed(2)}`;
+  const soft = `${Math.min(0.78, l + 0.12).toFixed(3)} ${(cc * 0.85).toFixed(3)} ${((h + 30) % 360).toFixed(2)}`;
   root.style.setProperty("--primary", `oklch(${base})`);
-  root.style.setProperty("--accent", `oklch(${lighter})`);
+  root.style.setProperty("--accent", `oklch(${soft})`);
   root.style.setProperty("--ring", `oklch(${base})`);
   root.style.setProperty("--neon-purple", `oklch(${base})`);
-  root.style.setProperty("--neon-pink", `oklch(${lighter})`);
-  root.style.setProperty("--gradient-brand", `linear-gradient(135deg, oklch(${base}), oklch(${lighter}))`);
-  root.style.setProperty("--shadow-glow", `0 0 40px oklch(${base} / 0.4)`);
+  root.style.setProperty("--neon-pink", `oklch(${soft})`);
+  root.style.setProperty("--gradient-brand", `linear-gradient(135deg, oklch(${base}) 0%, oklch(${soft}) 100%)`);
+  root.style.setProperty("--shadow-glow", `0 0 28px oklch(${base} / 0.22)`);
 }
 
 function clearAccent() {
