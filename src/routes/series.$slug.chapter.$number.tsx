@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Coins, Lock } from "lucide-react";
+import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Coins, Lock, Maximize2, Minimize2 } from "lucide-react";
 import { toast } from "sonner";
 
 type Chapter = Tables<"chapters">;
