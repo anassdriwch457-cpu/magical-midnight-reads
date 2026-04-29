@@ -65,7 +65,7 @@ export function SiteHeader() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Theme" className="text-white hover:text-primary hover:bg-white/10">
-                {theme === "magic" ? <Sparkles className="h-[18px] w-[18px]" /> : theme === "midnight" ? <Moon className="h-[18px] w-[18px]" /> : theme === "concrete" ? <Square className="h-[18px] w-[18px]" /> : <Palette className="h-[18px] w-[18px]" style={{ color: accent }} />}
+                {theme === "magic" ? <Sparkles className="h-[18px] w-[18px]" /> : theme === "midnight" ? <Moon className="h-[18px] w-[18px]" /> : theme === "concrete" ? <Square className="h-[18px] w-[18px]" /> : <Palette className="h-[18px] w-[18px]" />}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-60">
