@@ -101,6 +101,7 @@ ON CONFLICT DO NOTHING;`}</code></pre>
           {tab === "content" && <ContentView />}
           {tab === "users" && <UsersView canEditRoles={isSuperAdmin} />}
           {tab === "finance" && <FinanceView />}
+          {tab === "settings" && <SettingsView />}
         </div>
       </div>
     </div>
