@@ -1,11 +1,14 @@
-import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
-import { Coins, Sparkles, Moon, Square, User, LogOut, Shield, Palette } from "lucide-react";
+import { Coins, Sparkles, Moon, Square, User, LogOut, Shield, Palette, Search, X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/nuvia-logo.png";
+
+type SearchHit = { id: string; title: string; slug: string; cover_url: string | null; type: string };
 
 const PRESET_ACCENTS = ["#F47521", "#E11D48", "#7C3AED", "#3B82F6", "#10B981", "#F59E0B", "#EC4899", "#06B6D4"];
 
@@ -19,7 +22,13 @@ const NAV = [
 export function SiteHeader() {
   const { user, wallet, isAdmin, signOut } = useAuth();
   const { theme, setTheme, accent, setAccent } = useTheme();
+  const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<SearchHit[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -27,6 +36,37 @@ export function SiteHeader() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setHits([]); return; }
+    const t = setTimeout(async () => {
+      setSearching(true);
+      const { data } = await supabase
+        .from("series")
+        .select("id, title, slug, cover_url, type")
+        .ilike("title", `%${q}%`)
+        .limit(6);
+      setHits(data ?? []);
+      setSearching(false);
+    }, 220);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (!searchRef.current?.contains(e.target as Node)) setSearchOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const submitSearch = (q: string) => {
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    setSearchOpen(false);
+    navigate({ to: "/browse", search: { q: trimmed } });
+  };
 
   return (
     <header
@@ -62,6 +102,61 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <div ref={searchRef} className="relative hidden md:block">
+            <div className="flex items-center bg-white/10 hover:bg-white/15 focus-within:bg-white/20 rounded-full transition-colors w-56 lg:w-72">
+              <Search className="h-4 w-4 text-white/70 ml-3" />
+              <input
+                value={query}
+                onChange={(e) => { setQuery(e.target.value); setSearchOpen(true); }}
+                onFocus={() => setSearchOpen(true)}
+                onKeyDown={(e) => { if (e.key === "Enter") submitSearch(query); if (e.key === "Escape") setSearchOpen(false); }}
+                placeholder="Search series…"
+                className="bg-transparent text-sm text-white placeholder:text-white/50 px-2 py-2 flex-1 outline-none"
+              />
+              {query && (
+                <button onClick={() => { setQuery(""); setHits([]); }} className="mr-2 text-white/60 hover:text-white" aria-label="Clear">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {searchOpen && query.trim().length >= 2 && (
+              <div className="absolute top-full mt-2 left-0 right-0 rounded-lg border border-border bg-popover shadow-xl overflow-hidden z-50">
+                {searching && hits.length === 0 ? (
+                  <div className="px-3 py-4 text-sm text-muted-foreground">Searching…</div>
+                ) : hits.length === 0 ? (
+                  <div className="px-3 py-4 text-sm text-muted-foreground">No matches for "{query}"</div>
+                ) : (
+                  <>
+                    <ul className="max-h-80 overflow-auto">
+                      {hits.map((h) => (
+                        <li key={h.id}>
+                          <Link
+                            to="/series/$slug"
+                            params={{ slug: h.slug }}
+                            onClick={() => { setSearchOpen(false); setQuery(""); }}
+                            className="flex items-center gap-3 px-3 py-2 hover:bg-muted/60 transition-colors"
+                          >
+                            <img src={h.cover_url ?? ""} alt="" className="h-10 w-7 object-cover rounded bg-muted shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold truncate">{h.title}</div>
+                              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{h.type}</div>
+                            </div>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      onClick={() => submitSearch(query)}
+                      className="w-full text-left px-3 py-2 border-t border-border text-xs font-bold uppercase tracking-wider text-primary hover:bg-muted/60"
+                    >
+                      See all results for "{query}" →
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Theme" className="text-white hover:text-primary hover:bg-white/10">
