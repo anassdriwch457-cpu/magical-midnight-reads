@@ -27,6 +27,7 @@ function ReaderPage() {
   const [siblings, setSiblings] = useState<{ prev?: number; next?: number }>({});
   const [unlocked, setUnlocked] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [pagesLoading, setPagesLoading] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [debugMessage, setDebugMessage] = useState<string | null>(null);
@@ -38,6 +39,7 @@ function ReaderPage() {
     setErrorMessage(null);
     setDebugMessage(null);
     setPages([]);
+    setPagesLoading(false);
 
     try {
       const { data: s, error: seriesError } = await supabase
@@ -101,6 +103,8 @@ function ReaderPage() {
       setUnlocked(access);
 
       if (s.type === "manga" && access) {
+        setLoading(false);
+        setPagesLoading(true);
         const { data: pageRows, error: pagesError } = await supabase
           .from("chapter_pages")
           .select("*")
@@ -111,15 +115,18 @@ function ReaderPage() {
 
         const loadedPages = pageRows ?? [];
         setPages(loadedPages);
+        setPagesLoading(false);
 
         if (loadedPages.length === 0) {
           setDebugMessage(`Debug: Chapter ID ${currentChapter.id} reached. No images found in Supabase.`);
         }
+        return;
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown reader error";
       setErrorMessage(message);
       setDebugMessage(`Debug: Reader route loaded for ${slug} chapter ${number}, but fetching failed: ${message}`);
+      setPagesLoading(false);
     } finally {
       setLoading(false);
     }
@@ -278,7 +285,14 @@ function ReaderPage() {
       {renderTopBar()}
       <div className={`${series.type === "manga" ? "max-w-3xl mx-auto" : "max-w-2xl mx-auto px-4"} pt-20 pb-24`}>
         {series.type === "manga" ? (
-          pages.length === 0 ? (
+          pagesLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="flex flex-col items-center gap-4 text-white/80">
+                <div className="h-8 w-8 rounded-full border-2 border-white/20 border-t-primary animate-spin" />
+                <p className="text-sm">Loading chapter pages…</p>
+              </div>
+            </div>
+          ) : pages.length === 0 ? (
             <div className="px-4 py-20">
               <div className="mx-auto max-w-xl rounded-[6px] border border-border bg-card p-5 text-left shadow-card">
                 <div className="flex items-start gap-3 text-primary">
