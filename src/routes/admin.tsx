@@ -817,6 +817,7 @@ type AdminUser = {
   coins: number;
   created_at: string;
   roles: string[];
+  banned_until: string | null;
 };
 
 const ROLES_EDITABLE: { key: "admin" | "manager" | "super_admin"; label: string }[] = [
@@ -825,10 +826,16 @@ const ROLES_EDITABLE: { key: "admin" | "manager" | "super_admin"; label: string 
   { key: "super_admin", label: "Super-Admin" },
 ];
 
+function isBanned(u: { banned_until: string | null }): boolean {
+  if (!u.banned_until) return false;
+  return new Date(u.banned_until).getTime() > Date.now();
+}
+
 function UsersView({ canEditRoles }: { canEditRoles: boolean }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filterRole, setFilterRole] = useState<"all" | "staff" | "banned">("all");
   const [selected, setSelected] = useState<AdminUser | null>(null);
 
   const load = async () => {
@@ -842,60 +849,90 @@ function UsersView({ canEditRoles }: { canEditRoles: boolean }) {
 
   const filtered = users.filter(u => {
     const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return u.email.toLowerCase().includes(q) || (u.display_name ?? "").toLowerCase().includes(q);
+    if (q && !u.email.toLowerCase().includes(q) && !(u.display_name ?? "").toLowerCase().includes(q)) return false;
+    if (filterRole === "staff" && u.roles.length === 0) return false;
+    if (filterRole === "banned" && !isBanned(u)) return false;
+    return true;
   });
+
+  const stats = useMemo(() => ({
+    total: users.length,
+    staff: users.filter(u => u.roles.length > 0).length,
+    banned: users.filter(isBanned).length,
+  }), [users]);
 
   return (
     <div>
-      <SectionHeader icon={UsersIcon} title="Users" subtitle={`${users.length} total`} />
+      <SectionHeader icon={UsersIcon} title="Users" subtitle={`${stats.total} total · ${stats.staff} staff · ${stats.banned} banned`} />
 
-      <Input
-        placeholder="Search by email or display name…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-sm mb-5"
-      />
+      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        <Input
+          placeholder="Search by email or display name…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
+        <Select value={filterRole} onValueChange={(v) => setFilterRole(v as typeof filterRole)}>
+          <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All users</SelectItem>
+            <SelectItem value="staff">Staff only</SelectItem>
+            <SelectItem value="banned">Banned only</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {loading ? <p className="text-muted-foreground py-8 text-center">Loading…</p> :
-        <div className="rounded-md border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-card text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="text-left px-4 py-3">User</th>
-                <th className="text-left px-4 py-3 hidden md:table-cell">Roles</th>
-                <th className="text-left px-4 py-3 w-28">Coins</th>
-                <th className="text-left px-4 py-3 hidden md:table-cell w-32">Joined</th>
-                <th className="text-right px-4 py-3 w-28">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(u => (
-                <tr key={u.id} className="border-t border-border hover:bg-card/50">
-                  <td className="px-4 py-3">
-                    <div className="font-bold">{u.display_name || u.email.split("@")[0]}</div>
-                    <div className="text-xs text-muted-foreground">{u.email}</div>
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    <div className="flex flex-wrap gap-1">
-                      {u.roles.length === 0 ? <span className="text-xs text-muted-foreground">user</span> :
-                        u.roles.map(r => <Badge key={r} variant="outline" className="text-[10px]">{r}</Badge>)}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-bold tabular-nums">
-                    <span className="inline-flex items-center gap-1"><Coins className="h-3.5 w-3.5 text-primary" /> {u.coins}</span>
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-right">
-                    <Button size="sm" variant="outline" onClick={() => setSelected(u)}>Manage</Button>
-                  </td>
+        <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-xl overflow-hidden shadow-xl shadow-black/5">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="text-left px-4 py-3">User</th>
+                  <th className="text-left px-4 py-3 hidden md:table-cell">Roles</th>
+                  <th className="text-left px-4 py-3 w-28">Coins</th>
+                  <th className="text-left px-4 py-3 hidden lg:table-cell w-32">Joined</th>
+                  <th className="text-right px-4 py-3 w-28">Action</th>
                 </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No users match your search.</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map(u => {
+                  const banned = isBanned(u);
+                  return (
+                    <tr key={u.id} className={`border-t border-border/40 hover:bg-card/60 transition-colors ${banned ? "opacity-60" : ""}`}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <div className="font-bold flex items-center gap-2">
+                              {u.display_name || u.email.split("@")[0]}
+                              {banned && <Badge variant="destructive" className="text-[9px] uppercase">Banned</Badge>}
+                            </div>
+                            <div className="text-xs text-muted-foreground">{u.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <div className="flex flex-wrap gap-1">
+                          {u.roles.length === 0 ? <span className="text-xs text-muted-foreground">user</span> :
+                            u.roles.map(r => <Badge key={r} variant="outline" className="text-[10px] border-primary/40 text-primary">{r}</Badge>)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-bold tabular-nums">
+                        <span className="inline-flex items-center gap-1"><Coins className="h-3.5 w-3.5 text-primary" /> {u.coins}</span>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" variant="outline" onClick={() => setSelected(u)}>Manage</Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No users match your filters.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       }
 
@@ -922,6 +959,8 @@ function UserModal({ user, canEditRoles, onClose, onChanged }: {
   const [busy, setBusy] = useState(false);
   const [roles, setRoles] = useState<string[]>(user.roles);
   const [coins, setCoins] = useState(user.coins);
+  const [banned, setBanned] = useState(isBanned(user));
+  const banFn = useServerFn(setUserBan);
 
   const adjust = async () => {
     const d = parseInt(delta);
@@ -952,15 +991,36 @@ function UserModal({ user, canEditRoles, onClose, onChanged }: {
     onChanged();
   };
 
+  const toggleBan = async () => {
+    const next = !banned;
+    if (next && !confirm(`Ban ${user.email}? They will be signed out and unable to log back in.`)) return;
+    setBusy(true);
+    try {
+      await banFn({ data: { targetUserId: user.id, ban: next } });
+      setBanned(next);
+      toast.success(next ? "User banned" : "User unbanned");
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-card border border-border rounded-lg max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-5">
-          <h3 className="text-lg font-bold">{user.display_name || user.email.split("@")[0]}</h3>
-          <p className="text-xs text-muted-foreground">{user.email}</p>
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card/95 backdrop-blur-xl border border-border/50 rounded-xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              {user.display_name || user.email.split("@")[0]}
+              {banned && <Badge variant="destructive" className="text-[10px]">Banned</Badge>}
+            </h3>
+            <p className="text-xs text-muted-foreground">{user.email}</p>
+          </div>
         </div>
 
-        <div className="rounded-md bg-primary/5 border border-primary/30 p-4 mb-5">
+        <div className="rounded-md bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/30 p-4 mb-5">
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Current balance</div>
           <div className="text-2xl font-extrabold text-primary tabular-nums">{coins.toLocaleString()} coins</div>
         </div>
@@ -980,13 +1040,13 @@ function UserModal({ user, canEditRoles, onClose, onChanged }: {
         </div>
 
         {canEditRoles && (
-          <div className="mt-6 border-t border-border pt-5">
+          <div className="mt-6 border-t border-border/40 pt-5">
             <Label className="mb-2 block">Roles</Label>
             <div className="space-y-2">
               {ROLES_EDITABLE.map(r => {
                 const on = roles.includes(r.key);
                 return (
-                  <div key={r.key} className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2">
+                  <div key={r.key} className="flex items-center justify-between rounded-md border border-border/50 bg-background/60 px-3 py-2">
                     <div>
                       <div className="text-sm font-bold">{r.label}</div>
                       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{r.key}</div>
@@ -1006,10 +1066,137 @@ function UserModal({ user, canEditRoles, onClose, onChanged }: {
           </div>
         )}
 
+        <div className="mt-6 border-t border-border/40 pt-5">
+          <Label className="mb-2 block">Account access</Label>
+          <Button
+            onClick={toggleBan}
+            disabled={busy}
+            variant={banned ? "outline" : "destructive"}
+            className="w-full font-bold"
+          >
+            {banned ? <><CheckCircle2 className="h-4 w-4" /> Unban User</> : <><Ban className="h-4 w-4" /> Ban User</>}
+          </Button>
+          <p className="text-[11px] text-muted-foreground mt-2">
+            {banned
+              ? "Banned users cannot sign in or use existing sessions. Unban to restore access."
+              : "Banning prevents sign-in and invalidates all existing sessions immediately."}
+          </p>
+        </div>
+
         <div className="mt-6 flex justify-end">
           <Button variant="outline" onClick={onClose}>Close</Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------------------- FINANCE LOG ---------------------- */
+type FinanceRow = {
+  occurred_at: string;
+  kind: "unlock" | "adjustment";
+  user_id: string;
+  user_email: string | null;
+  amount: number;
+  note: string;
+};
+
+function FinanceView() {
+  const [rows, setRows] = useState<FinanceRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "unlock" | "adjustment">("all");
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data, error } = await supabase.rpc("admin_finance_log", { _limit: 200 });
+      if (error) toast.error(error.message);
+      setRows((data ?? []) as FinanceRow[]);
+      setLoading(false);
+    })();
+  }, []);
+
+  const filtered = rows.filter(r => {
+    if (filter !== "all" && r.kind !== filter) return false;
+    const q = search.trim().toLowerCase();
+    if (q && !(r.user_email ?? "").toLowerCase().includes(q) && !r.note.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const totals = useMemo(() => {
+    const spent = rows.filter(r => r.kind === "unlock").reduce((a, r) => a + Math.abs(r.amount), 0);
+    const granted = rows.filter(r => r.kind === "adjustment" && r.amount > 0).reduce((a, r) => a + r.amount, 0);
+    const removed = rows.filter(r => r.kind === "adjustment" && r.amount < 0).reduce((a, r) => a + Math.abs(r.amount), 0);
+    return { spent, granted, removed };
+  }, [rows]);
+
+  return (
+    <div>
+      <SectionHeader icon={Receipt} title="Finance Log" subtitle={`Latest ${rows.length} transactions`} />
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <StatCard icon={Coins} label="Coins Spent" value={totals.spent.toLocaleString()} accent />
+        <StatCard icon={ArrowUpRight} label="Granted by Staff" value={totals.granted.toLocaleString()} />
+        <StatCard icon={ArrowDownRight} label="Removed by Staff" value={totals.removed.toLocaleString()} />
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        <Input
+          placeholder="Search email or note…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
+        <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
+          <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All transactions</SelectItem>
+            <SelectItem value="unlock">Chapter unlocks</SelectItem>
+            <SelectItem value="adjustment">Admin adjustments</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {loading ? <p className="text-muted-foreground py-8 text-center">Loading…</p> :
+        <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-xl overflow-hidden shadow-xl shadow-black/5">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="text-left px-4 py-3 w-36 hidden sm:table-cell">When</th>
+                  <th className="text-left px-4 py-3">User</th>
+                  <th className="text-left px-4 py-3 hidden md:table-cell">Detail</th>
+                  <th className="text-right px-4 py-3 w-28">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((r, i) => (
+                  <tr key={i} className="border-t border-border/40 hover:bg-card/60 transition-colors">
+                    <td className="px-4 py-3 hidden sm:table-cell text-xs text-muted-foreground tabular-nums">
+                      {new Date(r.occurred_at).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-xs font-mono truncate max-w-[180px]">{r.user_email ?? r.user_id.slice(0, 8)}</div>
+                      <div className="md:hidden text-[10px] text-muted-foreground truncate max-w-[180px]">{r.note}</div>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell text-xs">
+                      <Badge variant="outline" className="mr-2 text-[9px] uppercase">{r.kind}</Badge>
+                      <span className="text-muted-foreground">{r.note}</span>
+                    </td>
+                    <td className={`px-4 py-3 text-right font-bold tabular-nums ${r.amount < 0 ? "text-destructive" : "text-primary"}`}>
+                      {r.amount > 0 ? "+" : ""}{r.amount.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No transactions match your filters.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
     </div>
   );
 }
