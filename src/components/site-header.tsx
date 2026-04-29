@@ -3,12 +3,14 @@ import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
-import { Coins, Sparkles, Moon, Square, User, LogOut, Shield } from "lucide-react";
+import { Coins, Sparkles, Moon, Square, User, LogOut, Shield, Palette } from "lucide-react";
 import logo from "@/assets/nuvia-logo.png";
+
+const PRESET_ACCENTS = ["#d946ef", "#a855f7", "#ec4899", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#06b6d4"];
 
 export function SiteHeader() {
   const { user, wallet, isAdmin, signOut } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, accent, setAccent } = useTheme();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl">
