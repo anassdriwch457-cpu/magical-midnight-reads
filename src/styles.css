@@ -39,35 +39,35 @@
   --color-coin: var(--coin);
 }
 
-/* MAGIC THEME — default. Deep midnight + royal purple / dusty rose. Premium, easy on the eyes. */
+/* MAGIC THEME — Crunchyroll-inspired premium dark. Charcoal + Nuvia Orange */
 :root, .theme-magic {
-  --radius: 0.75rem;
-  --background: oklch(0.19 0.025 265);           /* softer matte midnight */
-  --foreground: oklch(0.92 0.012 265);           /* off-white #E2E8F0 */
-  --card: oklch(0.24 0.028 265);                 /* #1E293B-ish surface */
-  --card-foreground: oklch(0.92 0.012 265);
-  --popover: oklch(0.22 0.028 265);
-  --popover-foreground: oklch(0.92 0.012 265);
-  --primary: oklch(0.58 0.20 300);               /* royal purple #7C3AED */
-  --primary-foreground: oklch(0.98 0.005 280);
-  --secondary: oklch(0.28 0.035 270);
-  --secondary-foreground: oklch(0.92 0.012 265);
-  --muted: oklch(0.26 0.025 265);
-  --muted-foreground: oklch(0.72 0.02 270);
-  --accent: oklch(0.74 0.13 305);                /* soft amethyst #A78BFA */
-  --accent-foreground: oklch(0.18 0.03 270);
+  --radius: 0.25rem;                              /* sharp 4px corners */
+  --background: oklch(0.13 0.005 270);            /* deep charcoal #0B0B0B */
+  --foreground: oklch(0.96 0.005 270);            /* near-white */
+  --card: oklch(0.18 0.005 270);                  /* soft surface */
+  --card-foreground: oklch(0.96 0.005 270);
+  --popover: oklch(0.16 0.005 270);
+  --popover-foreground: oklch(0.96 0.005 270);
+  --primary: oklch(0.72 0.18 50);                 /* Nuvia Orange #F47521 */
+  --primary-foreground: oklch(0.10 0.005 270);
+  --secondary: oklch(0.22 0.005 270);
+  --secondary-foreground: oklch(0.96 0.005 270);
+  --muted: oklch(0.20 0.005 270);
+  --muted-foreground: oklch(0.68 0.005 270);      /* light grey #A0A0A0 */
+  --accent: oklch(0.72 0.18 50);
+  --accent-foreground: oklch(0.10 0.005 270);
   --destructive: oklch(0.58 0.20 25);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.32 0.03 270 / 0.55);
-  --input: oklch(0.27 0.03 270);
-  --ring: oklch(0.58 0.20 300);
-  --neon-purple: oklch(0.58 0.20 300);           /* deep royal purple */
-  --neon-pink: oklch(0.66 0.18 350);             /* dusty rose #F472B6 vibe */
-  --coin: oklch(0.80 0.14 85);
-  --gradient-brand: linear-gradient(135deg, oklch(0.55 0.18 295) 0%, oklch(0.62 0.17 330) 60%, oklch(0.66 0.16 350) 100%);
-  --gradient-hero: linear-gradient(180deg, oklch(0.19 0.025 265 / 0), oklch(0.19 0.025 265 / 0.96));
-  --shadow-glow: 0 0 28px oklch(0.58 0.18 305 / 0.22);
-  --shadow-card: 0 8px 28px oklch(0.08 0.03 270 / 0.5);
+  --border: oklch(0.26 0.005 270 / 0.7);
+  --input: oklch(0.22 0.005 270);
+  --ring: oklch(0.72 0.18 50);
+  --neon-purple: oklch(0.72 0.18 50);             /* repurposed → orange */
+  --neon-pink: oklch(0.78 0.16 55);
+  --coin: oklch(0.82 0.16 85);
+  --gradient-brand: linear-gradient(135deg, oklch(0.72 0.18 50) 0%, oklch(0.65 0.20 35) 100%);
+  --gradient-hero: linear-gradient(90deg, oklch(0.10 0.005 270 / 0.95) 0%, oklch(0.10 0.005 270 / 0.7) 45%, oklch(0.10 0.005 270 / 0) 80%);
+  --shadow-glow: 0 6px 20px oklch(0.72 0.18 50 / 0.18);
+  --shadow-card: 0 4px 16px oklch(0.05 0 0 / 0.5);
 }
 
 /* MIDNIGHT THEME — pure dark, subtle blue */

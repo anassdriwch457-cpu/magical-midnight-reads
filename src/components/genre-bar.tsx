@@ -1,47 +1,42 @@
 import { Link } from "@tanstack/react-router";
-import { Sparkles, TrendingUp, Clock, LayoutGrid } from "lucide-react";
 
-const PRIMARY = [
-  { label: "New Manga", icon: Sparkles, to: "/browse", search: { sort: "latest", type: "manga" } },
-  { label: "Top Manga", icon: TrendingUp, to: "/browse", search: { sort: "popular", type: "manga" } },
-  { label: "Last Updates", icon: Clock, to: "/browse", search: { sort: "latest" } },
-  { label: "All Genres", icon: LayoutGrid, to: "/browse", search: {} },
-] as const;
+const TABS = [
+  { label: "New Manga", search: { sort: "latest", type: "manga" } },
+  { label: "Top Manga", search: { sort: "popular", type: "manga" } },
+  { label: "Last Updates", search: { sort: "latest" } },
+  { label: "All", search: {} },
+];
 
-const GENRES = ["Yaoi","Comedy","Shounen Ai","Yuri","Shoujo","Fantasy","Josei","School Life"];
+const GENRES = ["Action", "Romance", "Fantasy", "Comedy", "Shounen Ai", "Yaoi", "Yuri", "Shoujo", "Josei", "School Life", "Adventure", "Drama"];
 
 export function GenreBar() {
   return (
-    <section className="container mx-auto px-4 py-6 space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {PRIMARY.map(({ label, icon: Icon, to }) => (
-          <Link
-            key={label}
-            to={to}
-            className="group relative flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3.5 text-sm md:text-base font-semibold text-primary-foreground shadow-card transition-all hover:shadow-glow hover:-translate-y-0.5"
-          >
-            <Icon className="h-4 w-4 opacity-90" />
-            <span>{label}</span>
-          </Link>
-        ))}
-      </div>
-
-      <nav
-        aria-label="Genres"
-        className="flex items-center gap-3 overflow-x-auto whitespace-nowrap pb-1 text-sm text-muted-foreground [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {GENRES.map((g, i) => (
-          <span key={g} className="flex items-center gap-3">
+    <section className="border-b border-border/60 bg-background/60">
+      <div className="container mx-auto px-4">
+        <div
+          className="flex items-center gap-7 overflow-x-auto whitespace-nowrap py-3 text-[13px] font-bold uppercase tracking-wider [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {TABS.map((t) => (
             <Link
+              key={t.label}
               to="/browse"
-              className="transition-colors hover:text-[var(--neon-pink)] hover:drop-shadow-[0_0_8px_var(--neon-pink)]"
+              className="text-foreground/90 hover:text-primary transition-colors py-1 border-b-2 border-transparent hover:border-primary"
+            >
+              {t.label}
+            </Link>
+          ))}
+          <span className="h-5 w-px bg-border" />
+          {GENRES.map((g) => (
+            <Link
+              key={g}
+              to="/browse"
+              className="text-muted-foreground hover:text-primary transition-colors py-1"
             >
               {g}
             </Link>
-            {i < GENRES.length - 1 && <span className="text-border">|</span>}
-          </span>
-        ))}
-      </nav>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
