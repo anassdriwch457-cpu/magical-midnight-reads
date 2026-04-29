@@ -63,10 +63,16 @@ async function appendLog(jobId: string, line: string) {
   await supabaseAdmin.from("import_jobs").update({ logs }).eq("id", jobId);
 }
 
-async function setJob(
-  jobId: string,
-  patch: Record<string, unknown>,
-) {
+type JobPatch = Partial<{
+  status: string;
+  current_chapter: string | null;
+  error: string | null;
+  series_id: string | null;
+  total_chapters: number;
+  completed_chapters: number;
+}>;
+
+async function setJob(jobId: string, patch: JobPatch) {
   await supabaseAdmin.from("import_jobs").update(patch).eq("id", jobId);
 }
 
