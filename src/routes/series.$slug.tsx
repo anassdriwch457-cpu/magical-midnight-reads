@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import type { Tables } from "@/integrations/supabase/types";
 import { Badge } from "@/components/ui/badge";
 import { Lock, Coins, Eye, BookOpen } from "lucide-react";
+import { resolveImage, onImageError } from "@/lib/image";
 
 type Series = Tables<"series">;
 type Chapter = Tables<"chapters">;
