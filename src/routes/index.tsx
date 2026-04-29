@@ -7,6 +7,7 @@ import { LatestUpdateCard } from "@/components/latest-update-card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { GenreBar } from "@/components/genre-bar";
+import { resolveImage, onImageError } from "@/lib/image";
 
 type Series = Tables<"series">;
 type Chapter = Tables<"chapters">;
