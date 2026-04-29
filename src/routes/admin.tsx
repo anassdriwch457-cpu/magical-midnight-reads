@@ -360,12 +360,17 @@ function ContentView() {
 function SeriesList({ onEdit, onChapters, onNew }: { onEdit: (id: string) => void; onChapters: (id: string) => void; onNew: () => void }) {
   const [items, setItems] = useState<Series[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
     const { data, error } = await supabase.from("series").select("*").order("created_at", { ascending: false });
     if (error) toast.error(error.message);
     setItems(data ?? []);
+    setSelected(new Set());
     setLoading(false);
   };
 
@@ -379,21 +384,125 @@ function SeriesList({ onEdit, onChapters, onNew }: { onEdit: (id: string) => voi
     load();
   };
 
+  const toggleSelect = (id: string) => {
+    setSelected(s => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const filtered = items.filter(s => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return s.title.toLowerCase().includes(q) || s.slug.toLowerCase().includes(q);
+  });
+
+  const allVisibleSelected = filtered.length > 0 && filtered.every(s => selected.has(s.id));
+  const toggleAllVisible = () => {
+    setSelected(s => {
+      const next = new Set(s);
+      if (allVisibleSelected) filtered.forEach(f => next.delete(f.id));
+      else filtered.forEach(f => next.add(f.id));
+      return next;
+    });
+  };
+
+  const bulkFlag = async (field: "is_trending" | "is_popular", value: boolean) => {
+    if (selected.size === 0) return toast.error("Nothing selected");
+    setBulkBusy(true);
+    const ids = Array.from(selected);
+    const { data, error } = await supabase.rpc("admin_bulk_update_series_flags", {
+      _ids: ids,
+      _is_trending: field === "is_trending" ? value : null,
+      _is_popular: field === "is_popular" ? value : null,
+    });
+    setBulkBusy(false);
+    if (error) return toast.error(error.message);
+    const res = data as { success: boolean; updated?: number; error?: string };
+    if (!res.success) return toast.error(res.error ?? "Failed");
+    toast.success(`Updated ${res.updated} series`);
+    load();
+  };
+
+  const bulkDelete = async () => {
+    if (selected.size === 0) return toast.error("Nothing selected");
+    if (!confirm(`Delete ${selected.size} series and all their chapters? This cannot be undone.`)) return;
+    setBulkBusy(true);
+    const { error } = await supabase.from("series").delete().in("id", Array.from(selected));
+    setBulkBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success(`Deleted ${selected.size}`);
+    load();
+  };
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <SectionHeader icon={Library} title="Series Library" subtitle={`${items.length} title${items.length === 1 ? "" : "s"}`} />
         <Button onClick={onNew} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
           <Plus className="h-4 w-4" /> New Series
         </Button>
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <Input placeholder="Search title or slug…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+        <div className="flex gap-1 rounded-md border border-border/50 bg-card/40 backdrop-blur-xl p-1 ml-auto">
+          <button onClick={() => setView("grid")} className={`p-1.5 rounded ${view === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`} title="Grid view"><LayoutGrid className="h-4 w-4" /></button>
+          <button onClick={() => setView("list")} className={`p-1.5 rounded ${view === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`} title="List view"><Rows3 className="h-4 w-4" /></button>
+        </div>
+      </div>
+
+      {selected.size > 0 && (
+        <div className="rounded-xl border border-primary/40 bg-gradient-to-r from-primary/15 to-primary/5 backdrop-blur-xl p-3 mb-4 flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-bold mr-2">{selected.size} selected</span>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkFlag("is_trending", true)}><Flame className="h-3.5 w-3.5" /> Mark Trending</Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkFlag("is_trending", false)}>Untrending</Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkFlag("is_popular", true)}><Sparkles className="h-3.5 w-3.5" /> Mark Popular</Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkFlag("is_popular", false)}>Unpopular</Button>
+          <Button size="sm" variant="destructive" disabled={bulkBusy} onClick={bulkDelete} className="ml-auto"><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
+        </div>
+      )}
+
       {loading ? <p className="text-muted-foreground py-8 text-center">Loading…</p> :
-        items.length === 0 ? <p className="text-muted-foreground py-8 text-center">No series yet. Create your first one.</p> :
-        <div className="rounded-md border border-border overflow-hidden">
+        filtered.length === 0 ? <p className="text-muted-foreground py-8 text-center">{search ? "No matches." : "No series yet. Create your first one."}</p> :
+        view === "grid" ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {filtered.map(s => {
+              const sel = selected.has(s.id);
+              return (
+                <div key={s.id} className={`group relative rounded-xl overflow-hidden border backdrop-blur-xl transition-all ${sel ? "border-primary ring-2 ring-primary/40" : "border-border/50 bg-card/40 hover:border-primary/40"}`}>
+                  <button onClick={() => toggleSelect(s.id)} className="absolute top-2 left-2 z-10 h-6 w-6 rounded-md bg-background/80 backdrop-blur border border-border/60 flex items-center justify-center" aria-label="Select">
+                    <div className={`h-3.5 w-3.5 rounded-sm ${sel ? "bg-primary" : "bg-transparent border border-border"}`} />
+                  </button>
+                  <div className="absolute top-2 right-2 z-10 flex gap-1">
+                    {s.is_trending && <span title="Trending" className="h-6 w-6 rounded-md bg-orange-500/90 text-white flex items-center justify-center"><Flame className="h-3.5 w-3.5" /></span>}
+                    {s.is_popular && <span title="Popular" className="h-6 w-6 rounded-md bg-primary/90 text-primary-foreground flex items-center justify-center"><Sparkles className="h-3.5 w-3.5" /></span>}
+                  </div>
+                  <div className="aspect-[2/3] bg-muted overflow-hidden">
+                    {s.cover_url ? <img src={s.cover_url} alt={s.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform" /> :
+                      <div className="h-full w-full flex items-center justify-center"><ImageIcon className="h-8 w-8 text-muted-foreground" /></div>}
+                  </div>
+                  <div className="p-2.5">
+                    <div className="font-bold text-sm truncate">{s.title}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.type} · {s.status}</div>
+                    <div className="flex gap-1 mt-2">
+                      <Button size="sm" variant="ghost" className="h-7 px-1.5" onClick={() => onChapters(s.id)} title="Chapters"><BookOpen className="h-3.5 w-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="h-7 px-1.5" onClick={() => onEdit(s.id)} title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="h-7 px-1.5 ml-auto text-destructive hover:text-destructive" onClick={() => remove(s.id, s.title)} title="Delete"><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+        <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-xl overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-card text-xs uppercase tracking-wider text-muted-foreground">
+            <thead className="bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
+                <th className="px-3 py-3 w-8"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} /></th>
                 <th className="text-left px-4 py-3">Title</th>
                 <th className="text-left px-4 py-3 hidden md:table-cell">Type</th>
                 <th className="text-left px-4 py-3 hidden md:table-cell">Status</th>
@@ -401,13 +510,17 @@ function SeriesList({ onEdit, onChapters, onNew }: { onEdit: (id: string) => voi
               </tr>
             </thead>
             <tbody>
-              {items.map(s => (
-                <tr key={s.id} className="border-t border-border hover:bg-card/50">
+              {filtered.map(s => (
+                <tr key={s.id} className="border-t border-border/40 hover:bg-card/60">
+                  <td className="px-3 py-3"><input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelect(s.id)} /></td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       {s.cover_url && <img src={s.cover_url} alt="" className="h-12 w-9 object-cover rounded-sm" />}
                       <div>
-                        <div className="font-bold">{s.title}</div>
+                        <div className="font-bold flex items-center gap-1.5">{s.title}
+                          {s.is_trending && <Flame className="h-3 w-3 text-orange-500" />}
+                          {s.is_popular && <Sparkles className="h-3 w-3 text-primary" />}
+                        </div>
                         <div className="text-xs text-muted-foreground">/{s.slug}</div>
                       </div>
                     </div>
@@ -426,6 +539,7 @@ function SeriesList({ onEdit, onChapters, onNew }: { onEdit: (id: string) => voi
             </tbody>
           </table>
         </div>
+        )
       }
     </div>
   );
