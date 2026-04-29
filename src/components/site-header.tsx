@@ -22,7 +22,13 @@ const NAV = [
 export function SiteHeader() {
   const { user, wallet, isAdmin, signOut } = useAuth();
   const { theme, setTheme, accent, setAccent } = useTheme();
+  const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<SearchHit[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -30,6 +36,37 @@ export function SiteHeader() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setHits([]); return; }
+    const t = setTimeout(async () => {
+      setSearching(true);
+      const { data } = await supabase
+        .from("series")
+        .select("id, title, slug, cover_url, type")
+        .ilike("title", `%${q}%`)
+        .limit(6);
+      setHits(data ?? []);
+      setSearching(false);
+    }, 220);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (!searchRef.current?.contains(e.target as Node)) setSearchOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const submitSearch = (q: string) => {
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    setSearchOpen(false);
+    navigate({ to: "/browse", search: { q: trimmed } });
+  };
 
   return (
     <header
