@@ -215,6 +215,38 @@ export type Database = {
         }
         Relationships: []
       }
+      site_settings: {
+        Row: {
+          hero_series_id: string | null
+          id: boolean
+          seo_description: string
+          site_name: string
+          updated_at: string
+        }
+        Insert: {
+          hero_series_id?: string | null
+          id?: boolean
+          seo_description?: string
+          site_name?: string
+          updated_at?: string
+        }
+        Update: {
+          hero_series_id?: string | null
+          id?: boolean
+          seo_description?: string
+          site_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_settings_hero_series_id_fkey"
+            columns: ["hero_series_id"]
+            isOneToOne: false
+            referencedRelation: "series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -260,6 +292,10 @@ export type Database = {
         Args: { _delta: number; _reason?: string; _target: string }
         Returns: Json
       }
+      admin_bulk_update_series_flags: {
+        Args: { _ids: string[]; _is_popular?: boolean; _is_trending?: boolean }
+        Returns: Json
+      }
       admin_finance_log: {
         Args: { _limit?: number }
         Returns: {
@@ -282,6 +318,10 @@ export type Database = {
           id: string
           roles: string[]
         }[]
+      }
+      admin_mass_update_chapter_price: {
+        Args: { _price: number; _series_id: string }
+        Returns: Json
       }
       admin_revenue_daily: {
         Args: { _days?: number }
