@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, notFound, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -15,12 +15,17 @@ export const Route = createFileRoute("/series/$slug")({
 
 function SeriesDetail() {
   const { slug } = Route.useParams();
+  const location = useLocation();
   const { user } = useAuth();
   const [series, setSeries] = useState<Series | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [notFoundFlag, setNotFoundFlag] = useState(false);
+
+  if (location.pathname.includes(`/series/${slug}/chapter/`)) {
+    return <Outlet />;
+  }
 
   useEffect(() => {
     (async () => {
