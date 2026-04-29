@@ -83,6 +83,7 @@ export type Database = {
           number: number
           price: number
           series_id: string
+          source_url: string | null
           title: string | null
         }
         Insert: {
@@ -92,6 +93,7 @@ export type Database = {
           number: number
           price?: number
           series_id: string
+          source_url?: string | null
           title?: string | null
         }
         Update: {
@@ -101,6 +103,7 @@ export type Database = {
           number?: number
           price?: number
           series_id?: string
+          source_url?: string | null
           title?: string | null
         }
         Relationships: [
@@ -182,6 +185,62 @@ export type Database = {
         }
         Relationships: []
       }
+      import_jobs: {
+        Row: {
+          completed_chapters: number
+          created_at: string
+          created_by: string
+          current_chapter: string | null
+          error: string | null
+          id: string
+          logs: string[]
+          series_id: string | null
+          source_site: string
+          source_url: string
+          status: string
+          total_chapters: number
+          updated_at: string
+        }
+        Insert: {
+          completed_chapters?: number
+          created_at?: string
+          created_by: string
+          current_chapter?: string | null
+          error?: string | null
+          id?: string
+          logs?: string[]
+          series_id?: string | null
+          source_site: string
+          source_url: string
+          status?: string
+          total_chapters?: number
+          updated_at?: string
+        }
+        Update: {
+          completed_chapters?: number
+          created_at?: string
+          created_by?: string
+          current_chapter?: string | null
+          error?: string | null
+          id?: string
+          logs?: string[]
+          series_id?: string | null
+          source_site?: string
+          source_url?: string
+          status?: string
+          total_chapters?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_jobs_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -215,6 +274,7 @@ export type Database = {
           is_popular: boolean
           is_trending: boolean
           slug: string
+          source_url: string | null
           status: Database["public"]["Enums"]["series_status"]
           title: string
           type: Database["public"]["Enums"]["series_type"]
@@ -232,6 +292,7 @@ export type Database = {
           is_popular?: boolean
           is_trending?: boolean
           slug: string
+          source_url?: string | null
           status?: Database["public"]["Enums"]["series_status"]
           title: string
           type?: Database["public"]["Enums"]["series_type"]
@@ -249,6 +310,7 @@ export type Database = {
           is_popular?: boolean
           is_trending?: boolean
           slug?: string
+          source_url?: string | null
           status?: Database["public"]["Enums"]["series_status"]
           title?: string
           type?: Database["public"]["Enums"]["series_type"]
