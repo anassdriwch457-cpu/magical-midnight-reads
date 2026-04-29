@@ -1,0 +1,104 @@
+import { Link } from "@tanstack/react-router";
+import { Coins } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
+
+type Series = Pick<Tables<"series">, "id" | "slug" | "title" | "cover_url" | "type">;
+type Chapter = Pick<Tables<"chapters">, "id" | "number" | "price" | "created_at">;
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  const w = Math.floor(d / 7);
+  if (w < 5) return `${w}w ago`;
+  const mo = Math.floor(d / 30);
+  if (mo < 12) return `${mo}mo ago`;
+  return `${Math.floor(d / 365)}y ago`;
+}
+
+export function LatestUpdateCard({
+  series,
+  chapters,
+}: {
+  series: Series;
+  chapters: Chapter[];
+}) {
+  const isNew = (createdAt: string) => Date.now() - new Date(createdAt).getTime() < 1000 * 60 * 60 * 48;
+
+  return (
+    <div className="flex gap-3 rounded-[6px] overflow-hidden bg-card border border-border hover:border-primary/60 transition-colors shadow-card">
+      <Link
+        to="/series/$slug"
+        params={{ slug: series.slug }}
+        className="shrink-0 w-[92px] sm:w-[110px] aspect-[2/3] bg-muted overflow-hidden group"
+      >
+        {series.cover_url && (
+          <img
+            src={series.cover_url}
+            alt={series.title}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+          />
+        )}
+      </Link>
+
+      <div className="flex-1 min-w-0 py-2 pr-2 flex flex-col" style={{ background: "#1A1A1A" }}>
+        <Link
+          to="/series/$slug"
+          params={{ slug: series.slug }}
+          className="block px-2"
+        >
+          <h3 className="font-bold text-sm text-foreground hover:text-primary transition-colors line-clamp-1">
+            {series.title}
+          </h3>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
+            {series.type === "manga" ? "Manga" : "Novel"}
+          </p>
+        </Link>
+
+        <ul className="mt-1.5 flex-1 divide-y divide-border/60">
+          {chapters.length === 0 && (
+            <li className="px-2 py-2 text-xs text-muted-foreground">No chapters yet</li>
+          )}
+          {chapters.map((c) => {
+            const free = c.price === 0;
+            const fresh = isNew(c.created_at);
+            return (
+              <li key={c.id}>
+                <Link
+                  to="/series/$slug/chapter/$number"
+                  params={{ slug: series.slug, number: String(c.number) }}
+                  className="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-white/5 transition-colors group"
+                >
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-xs font-semibold text-foreground/90 group-hover:text-primary truncate">
+                      Ch. {Number(c.number)}
+                    </span>
+                    {fresh && (
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-primary text-primary-foreground">
+                        New
+                      </span>
+                    )}
+                    {!free && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[var(--coin)]">
+                        <Coins className="h-3 w-3" /> {c.price}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0">
+                    {timeAgo(c.created_at)}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+}
