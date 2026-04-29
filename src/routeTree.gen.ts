@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TopupRouteImport } from './routes/topup'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as SuccessRouteImport } from './routes/success'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as BrowseRouteImport } from './routes/browse'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -27,6 +28,11 @@ const TopupRoute = TopupRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuccessRoute = SuccessRouteImport.update({
+  id: '/success',
+  path: '/success',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/browse': typeof BrowseRoute
   '/privacy': typeof PrivacyRoute
+  '/success': typeof SuccessRoute
   '/terms': typeof TermsRoute
   '/topup': typeof TopupRoute
   '/series/$slug': typeof SeriesSlugRouteWithChildren
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/browse': typeof BrowseRoute
   '/privacy': typeof PrivacyRoute
+  '/success': typeof SuccessRoute
   '/terms': typeof TermsRoute
   '/topup': typeof TopupRoute
   '/series/$slug': typeof SeriesSlugRouteWithChildren
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/browse': typeof BrowseRoute
   '/privacy': typeof PrivacyRoute
+  '/success': typeof SuccessRoute
   '/terms': typeof TermsRoute
   '/topup': typeof TopupRoute
   '/series/$slug': typeof SeriesSlugRouteWithChildren
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/browse'
     | '/privacy'
+    | '/success'
     | '/terms'
     | '/topup'
     | '/series/$slug'
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/browse'
     | '/privacy'
+    | '/success'
     | '/terms'
     | '/topup'
     | '/series/$slug'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/browse'
     | '/privacy'
+    | '/success'
     | '/terms'
     | '/topup'
     | '/series/$slug'
@@ -141,6 +153,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BrowseRoute: typeof BrowseRoute
   PrivacyRoute: typeof PrivacyRoute
+  SuccessRoute: typeof SuccessRoute
   TermsRoute: typeof TermsRoute
   TopupRoute: typeof TopupRoute
   SeriesSlugRoute: typeof SeriesSlugRouteWithChildren
@@ -160,6 +173,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/success': {
+      id: '/success'
+      path: '/success'
+      fullPath: '/success'
+      preLoaderRoute: typeof SuccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -232,6 +252,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BrowseRoute: BrowseRoute,
   PrivacyRoute: PrivacyRoute,
+  SuccessRoute: SuccessRoute,
   TermsRoute: TermsRoute,
   TopupRoute: TopupRoute,
   SeriesSlugRoute: SeriesSlugRouteWithChildren,
@@ -239,12 +260,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

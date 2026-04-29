@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Coins, Sparkles, Check, Zap, Crown, Star, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { COIN_PACKAGES, mockPurchaseCoins } from "@/server/topup.functions";
+import { COIN_PACKAGES, createCoinCheckout } from "@/server/topup.functions";
 
 const ICONS = [Coins, Star, Zap, Crown];
 
@@ -20,8 +20,8 @@ export const Route = createFileRoute("/topup")({
 });
 
 function TopupPage() {
-  const { user, session, wallet, refreshWallet } = useAuth();
-  const purchase = useServerFn(mockPurchaseCoins);
+  const { user, session, wallet } = useAuth();
+  const checkout = useServerFn(createCoinCheckout);
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   const handleBuy = async (packageId: string) => {
@@ -31,19 +31,17 @@ function TopupPage() {
     }
     setPendingId(packageId);
     try {
-      const res = await purchase({
+      const res = await checkout({
         data: { packageId },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      if (!res.success) {
-        toast.error(res.error ?? "Purchase failed");
-        return;
+      if (!res?.url) {
+        throw new Error("Could not start checkout");
       }
-      toast.success(`+${res.credited} coins added! New balance: ${res.balance}`);
-      await refreshWallet();
+      // Redirect to Stripe-hosted checkout.
+      window.location.href = res.url;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Purchase failed");
-    } finally {
+      toast.error(e instanceof Error ? e.message : "Could not start checkout");
       setPendingId(null);
     }
   };
@@ -129,8 +127,8 @@ function TopupPage() {
           <div className="mt-10 grid sm:grid-cols-3 gap-4 text-sm">
             {[
               { icon: Check, t: "Coins never expire" },
-              { icon: ShieldCheck, t: "Mock checkout — no real charge" },
-              { icon: Sparkles, t: "Instant credit to your wallet" },
+              { icon: ShieldCheck, t: "Secure checkout powered by Stripe" },
+              { icon: Sparkles, t: "Coins credited automatically after payment" },
             ].map(({ icon: I, t }) => (
               <div key={t} className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3">
                 <I className="h-4 w-4 text-primary" />
@@ -140,7 +138,8 @@ function TopupPage() {
           </div>
 
           <p className="text-xs text-center text-muted-foreground mt-6">
-            🧪 Demo mode: purchases are simulated. Hook up Lovable Payments to charge real cards.
+            You'll be redirected to Stripe to complete your purchase. Coins are credited to your
+            wallet only after successful payment.
           </p>
         </>
       )}
