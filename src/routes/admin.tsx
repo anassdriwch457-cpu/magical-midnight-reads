@@ -87,6 +87,7 @@ ON CONFLICT DO NOTHING;`}</code></pre>
           roleLabel={isSuperAdmin ? "Super-Admin" : isManager ? "Manager" : isUploader ? "Uploader" : "Staff"}
         />
         <div className="flex-1 min-w-0 p-6 md:p-10">
+          <MobileTabs tab={tab} setTab={setTab} allowedTabs={allowedTabs} />
           {tab === "analytics" && <AnalyticsView />}
           {tab === "content" && <ContentView />}
           {tab === "users" && <UsersView canEditRoles={isSuperAdmin} />}
