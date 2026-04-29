@@ -1119,7 +1119,12 @@ function UserModal({ user, canEditRoles, onClose, onChanged }: {
     if (next && !confirm(`Ban ${user.email}? They will be signed out and unable to log back in.`)) return;
     setBusy(true);
     try {
-      await banFn({ data: { targetUserId: user.id, ban: next } });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+      await banFn({
+        data: { targetUserId: user.id, ban: next },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
       setBanned(next);
       toast.success(next ? "User banned" : "User unbanned");
       onChanged();
