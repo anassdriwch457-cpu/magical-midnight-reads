@@ -1,8 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import { setUserBan } from "@/server/admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,8 +14,12 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Shield, Plus, Pencil, Trash2, Upload, ArrowLeft, BookOpen, Image as ImageIcon,
-  BarChart3, Library, Users as UsersIcon, Coins, TrendingUp, Crown,
+  BarChart3, Library, Users as UsersIcon, Coins, TrendingUp, Crown, Ban, CheckCircle2,
+  Receipt, ArrowDownRight, ArrowUpRight,
 } from "lucide-react";
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+} from "recharts";
 import { toast } from "sonner";
 import JSZip from "jszip";
 
@@ -22,7 +28,7 @@ type Chapter = Tables<"chapters">;
 
 const ALL_GENRES = ["Action","Adventure","Comedy","Drama","Fantasy","Josei","Magic","Mystery","Romance","School Life","Shoujo","Shounen Ai","Supernatural","Yaoi","Yuri"];
 
-type Tab = "analytics" | "content" | "users";
+type Tab = "analytics" | "content" | "users" | "finance";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
