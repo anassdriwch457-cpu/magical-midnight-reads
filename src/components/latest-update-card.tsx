@@ -84,7 +84,11 @@ export function LatestUpdateCard({
                         New
                       </span>
                     )}
-                    {!free && (
+                    {free ? (
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded border border-emerald-500/40 text-emerald-400">
+                        Free
+                      </span>
+                    ) : (
                       <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[var(--coin)]">
                         <Coins className="h-3 w-3" /> {c.price}
                       </span>
