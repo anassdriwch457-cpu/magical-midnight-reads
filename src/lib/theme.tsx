@@ -39,9 +39,9 @@ function applyAccent(hex: string) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const { l, c, h } = hexToOklch(hex);
-  // Floor lightness so very dark accents stay visible on dark bg, but cap chroma for readability
+  // Floor lightness so very dark accents stay visible on dark bg; floor chroma so black/white still produce a usable accent
   const baseL = Math.max(0.55, Math.min(0.78, l));
-  const cc = Math.min(c, 0.22);
+  const cc = Math.max(0.08, Math.min(c, 0.22));
   const base = `${baseL.toFixed(3)} ${cc.toFixed(3)} ${h.toFixed(2)}`;
   const softL = Math.min(0.82, baseL + 0.10);
   const soft = `${softL.toFixed(3)} ${(cc * 0.9).toFixed(3)} ${((h + 25) % 360).toFixed(2)}`;
