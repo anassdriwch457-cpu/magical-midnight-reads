@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
@@ -6,33 +7,64 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Coins, Sparkles, Moon, Square, User, LogOut, Shield, Palette } from "lucide-react";
 import logo from "@/assets/nuvia-logo.png";
 
-const PRESET_ACCENTS = ["#d946ef", "#a855f7", "#ec4899", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#06b6d4"];
+const PRESET_ACCENTS = ["#F47521", "#E11D48", "#7C3AED", "#3B82F6", "#10B981", "#F59E0B", "#EC4899", "#06B6D4"];
+
+const NAV = [
+  { to: "/", label: "HOME" },
+  { to: "/browse", label: "BROWSE" },
+  { to: "/browse", label: "MANGA", search: { type: "manga" } },
+  { to: "/browse", label: "NOVELS", search: { type: "novel" } },
+] as const;
 
 export function SiteHeader() {
   const { user, wallet, isAdmin, signOut } = useAuth();
   const { theme, setTheme, accent, setAccent } = useTheme();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl">
+    <header
+      className={`fixed top-0 z-40 w-full transition-all duration-300 ${
+        scrolled
+          ? "bg-background/95 backdrop-blur-md border-b border-border/60"
+          : "bg-gradient-to-b from-black/70 to-transparent border-b border-transparent"
+      }`}
+    >
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link to="/" className="flex items-center gap-2 group">
-          <img src={logo} alt="Nuvia Toon" width={36} height={36} className="animate-float drop-shadow-[0_0_12px_var(--neon-pink)]" />
+        <Link to="/" className="flex items-center gap-2.5">
+          <img src={logo} alt="Nuvia Toon" width={32} height={32} className="brightness-0 invert" />
           <div className="leading-tight">
-            <div className="text-xl font-bold tracking-tight text-brand">Nuvia Toon</div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Magic · Stories · Worlds</div>
+            <div className="text-[17px] font-extrabold tracking-tight text-white">Nuvia Toon</div>
+            <div className="text-[9px] uppercase tracking-[0.18em] text-white/60 font-medium">
+              Your Next Paradise in Every Page
+            </div>
           </div>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-          <Link to="/" className="hover:text-primary transition-colors" activeProps={{ className: "text-primary" }}>Home</Link>
-          <Link to="/browse" className="hover:text-primary transition-colors" activeProps={{ className: "text-primary" }}>Browse</Link>
-          <Link to="/topup" className="hover:text-primary transition-colors" activeProps={{ className: "text-primary" }}>Top Up</Link>
+        <nav className="hidden md:flex items-center gap-7 text-[13px] font-bold tracking-wider">
+          {NAV.map((n) => (
+            <Link
+              key={n.label}
+              to={n.to}
+              className="text-white/80 hover:text-primary transition-colors"
+              activeProps={{ className: "text-primary" }}
+              activeOptions={{ exact: true }}
+            >
+              {n.label}
+            </Link>
+          ))}
         </nav>
 
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Theme">
+              <Button variant="ghost" size="icon" aria-label="Theme" className="text-white/80 hover:text-white hover:bg-white/10">
                 {theme === "magic" ? <Sparkles className="h-4 w-4" /> : theme === "midnight" ? <Moon className="h-4 w-4" /> : theme === "concrete" ? <Square className="h-4 w-4" /> : <Palette className="h-4 w-4" style={{ color: accent }} />}
               </Button>
             </DropdownMenuTrigger>
@@ -70,13 +102,13 @@ export function SiteHeader() {
 
           {user ? (
             <>
-              <Link to="/topup" className="hidden sm:flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm hover:shadow-glow transition-shadow">
+              <Link to="/topup" className="hidden sm:flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/15 transition-colors">
                 <Coins className="h-4 w-4 text-[var(--coin)]" />
                 <span className="font-semibold tabular-nums">{wallet?.coins ?? 0}</span>
               </Link>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon"><User className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10"><User className="h-4 w-4" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
@@ -89,8 +121,8 @@ export function SiteHeader() {
               </DropdownMenu>
             </>
           ) : (
-            <Button asChild className="bg-brand text-primary-foreground border-0 hover:opacity-90">
-              <Link to="/auth">Sign In</Link>
+            <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-[4px]">
+              <Link to="/auth">SIGN IN</Link>
             </Button>
           )}
         </div>
