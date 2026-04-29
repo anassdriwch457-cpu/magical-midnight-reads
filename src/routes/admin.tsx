@@ -46,6 +46,7 @@ function AdminPage() {
     const t: Tab[] = [];
     if (canViewAnalytics) t.push("analytics");
     if (canManageContent) t.push("content");
+    if (canManageContent) t.push("migrator");
     if (canManageUsers) t.push("users");
     if (canViewAnalytics) t.push("finance");
     if (isSuperAdmin || isManager) t.push("payments");
