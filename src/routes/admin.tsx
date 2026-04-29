@@ -414,8 +414,8 @@ function SeriesList({ onEdit, onChapters, onNew }: { onEdit: (id: string) => voi
     const ids = Array.from(selected);
     const { data, error } = await supabase.rpc("admin_bulk_update_series_flags", {
       _ids: ids,
-      _is_trending: field === "is_trending" ? value : null,
-      _is_popular: field === "is_popular" ? value : null,
+      _is_trending: field === "is_trending" ? value : undefined,
+      _is_popular: field === "is_popular" ? value : undefined,
     });
     setBulkBusy(false);
     if (error) return toast.error(error.message);
