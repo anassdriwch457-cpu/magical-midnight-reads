@@ -1,10 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
-import { Lock, Coins, ChevronLeft, ChevronRight } from "lucide-react";
+import { Lock, Coins, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
 type Chapter = Tables<"chapters">;
@@ -27,6 +27,8 @@ function ReaderPage() {
   const [unlocked, setUnlocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [unlocking, setUnlocking] = useState(false);
+  const [showUI, setShowUI] = useState(true);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -58,6 +60,26 @@ function ReaderPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [slug, number, user?.id]);
 
+  // Auto-hide UI after 2.5s of no movement
+  useEffect(() => {
+    if (!unlocked) return;
+    const reveal = () => {
+      setShowUI(true);
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      hideTimer.current = setTimeout(() => setShowUI(false), 2500);
+    };
+    reveal();
+    window.addEventListener("mousemove", reveal);
+    window.addEventListener("scroll", reveal, { passive: true });
+    window.addEventListener("touchstart", reveal, { passive: true });
+    return () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      window.removeEventListener("mousemove", reveal);
+      window.removeEventListener("scroll", reveal);
+      window.removeEventListener("touchstart", reveal);
+    };
+  }, [unlocked]);
+
   const handleUnlock = async () => {
     if (!user) { navigate({ to: "/auth" }); return; }
     if (!chapter) return;
@@ -76,25 +98,13 @@ function ReaderPage() {
     await load();
   };
 
-  if (loading) return <div className="container mx-auto px-4 py-20 text-center text-muted-foreground">Loading…</div>;
-  if (!series || !chapter) return <div className="container mx-auto px-4 py-20 text-center">Chapter not found.</div>;
-
-  const Nav = () => (
-    <div className="flex items-center justify-between gap-2 my-6">
-      {siblings.prev !== undefined ? (
-        <Button asChild variant="outline"><Link to="/series/$slug/chapter/$number" params={{ slug, number: String(siblings.prev) }}><ChevronLeft className="h-4 w-4 mr-1" /> Previous</Link></Button>
-      ) : <div />}
-      <Button asChild variant="ghost"><Link to="/series/$slug" params={{ slug }}>All chapters</Link></Button>
-      {siblings.next !== undefined ? (
-        <Button asChild variant="outline"><Link to="/series/$slug/chapter/$number" params={{ slug, number: String(siblings.next) }}>Next <ChevronRight className="h-4 w-4 ml-1" /></Link></Button>
-      ) : <div />}
-    </div>
-  );
+  if (loading) return <div className="pt-24 text-center text-muted-foreground">Loading…</div>;
+  if (!series || !chapter) return <div className="pt-24 text-center">Chapter not found.</div>;
 
   if (!unlocked) {
     return (
-      <div className="container mx-auto px-4 py-20 max-w-md text-center">
-        <div className="rounded-2xl border border-border bg-card p-10 shadow-card">
+      <div className="container mx-auto px-4 pt-24 pb-20 max-w-md text-center">
+        <div className="rounded-[4px] border border-border bg-card p-10 shadow-card">
           <Lock className="mx-auto h-12 w-12 text-primary mb-3" />
           <h1 className="text-2xl font-bold">Chapter {Number(chapter.number)} is locked</h1>
           <p className="text-muted-foreground mt-1">{series.title}</p>
@@ -102,8 +112,8 @@ function ReaderPage() {
             <Coins className="h-6 w-6 text-[var(--coin)]" /> {chapter.price}
           </div>
           {user && <p className="text-sm text-muted-foreground mb-4">Your balance: <span className="font-semibold text-foreground tabular-nums">{wallet?.coins ?? 0}</span></p>}
-          <Button onClick={handleUnlock} disabled={unlocking} className="w-full bg-brand text-primary-foreground border-0 shadow-glow">
-            {unlocking ? "Unlocking…" : user ? "Unlock chapter" : "Sign in to unlock"}
+          <Button onClick={handleUnlock} disabled={unlocking} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-[4px] h-11">
+            {unlocking ? "UNLOCKING…" : user ? "UNLOCK CHAPTER" : "SIGN IN TO UNLOCK"}
           </Button>
           <Button asChild variant="ghost" className="w-full mt-2"><Link to="/topup">Need more coins? Top up →</Link></Button>
         </div>
@@ -111,23 +121,60 @@ function ReaderPage() {
     );
   }
 
+  // Cinema mode — black background, auto-hide top + bottom bars
   return (
-    <div className="container mx-auto px-4 py-6 max-w-3xl">
-      <div className="mb-2"><Link to="/series/$slug" params={{ slug }} className="text-sm text-muted-foreground hover:text-primary">← {series.title}</Link></div>
-      <h1 className="text-2xl font-bold mb-2">Chapter {Number(chapter.number)}{chapter.title ? ` — ${chapter.title}` : ""}</h1>
-      <Nav />
-      {series.type === "manga" ? (
-        <div className="space-y-1 bg-black/20 rounded-lg overflow-hidden">
-          {pages.length === 0 ? <p className="text-center py-12 text-muted-foreground">No pages uploaded.</p> :
-            pages.map(p => <img key={p.id} src={p.image_url} alt={`Page ${p.page_number}`} loading="lazy" className="w-full block" />)
-          }
+    <div className="fixed inset-0 bg-black overflow-y-auto z-30">
+      {/* Top bar */}
+      <div
+        className={`fixed top-0 inset-x-0 z-40 bg-gradient-to-b from-black/90 to-transparent transition-opacity duration-300 ${showUI ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      >
+        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
+          <Link to="/series/$slug" params={{ slug }} className="flex items-center gap-2 text-sm text-white/90 hover:text-primary">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="font-bold truncate max-w-[40vw]">{series.title}</span>
+          </Link>
+          <div className="text-xs uppercase tracking-wider text-white/70 font-bold">
+            CH {Number(chapter.number)}{chapter.title ? ` · ${chapter.title}` : ""}
+          </div>
         </div>
-      ) : (
-        <article className="prose prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-base">
-          {chapter.content || "No content."}
-        </article>
-      )}
-      <Nav />
+      </div>
+
+      {/* Content */}
+      <div className={`${series.type === "manga" ? "max-w-3xl mx-auto" : "max-w-2xl mx-auto px-4"} pt-20 pb-24`}>
+        {series.type === "manga" ? (
+          pages.length === 0 ? <p className="text-center py-12 text-white/60">No pages uploaded.</p> :
+            pages.map(p => <img key={p.id} src={p.image_url} alt={`Page ${p.page_number}`} loading="lazy" className="w-full block" />)
+        ) : (
+          <article className="prose prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-base text-white/90">
+            {chapter.content || "No content."}
+          </article>
+        )}
+      </div>
+
+      {/* Bottom bar */}
+      <div
+        className={`fixed bottom-0 inset-x-0 z-40 bg-gradient-to-t from-black/95 to-transparent transition-opacity duration-300 ${showUI ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      >
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-2">
+          {siblings.prev !== undefined ? (
+            <Button asChild variant="ghost" className="text-white hover:bg-white/10 rounded-[4px]">
+              <Link to="/series/$slug/chapter/$number" params={{ slug, number: String(siblings.prev) }}>
+                <ChevronLeft className="h-4 w-4" /> PREV
+              </Link>
+            </Button>
+          ) : <div />}
+          <Button asChild variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10 text-xs uppercase tracking-wider">
+            <Link to="/series/$slug" params={{ slug }}>All chapters</Link>
+          </Button>
+          {siblings.next !== undefined ? (
+            <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-[4px]">
+              <Link to="/series/$slug/chapter/$number" params={{ slug, number: String(siblings.next) }}>
+                NEXT <ChevronRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          ) : <div />}
+        </div>
+      </div>
     </div>
   );
 }
