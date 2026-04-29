@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { Tables } from "@/integrations/supabase/types";
+import { resolveImage, onImageError } from "@/lib/image";
 
 export function SeriesCard({ series }: { series: Pick<Tables<"series">, "slug" | "title" | "cover_url" | "type" | "genres"> }) {
   return (
@@ -9,14 +10,13 @@ export function SeriesCard({ series }: { series: Pick<Tables<"series">, "slug" |
       className="group block"
     >
       <div className="relative aspect-[2/3] overflow-hidden rounded-[4px] bg-muted shadow-card">
-        {series.cover_url && (
-          <img
-            src={series.cover_url}
-            alt={series.title}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-          />
-        )}
+        <img
+          src={resolveImage(series.cover_url)}
+          onError={onImageError}
+          alt={series.title}
+          loading="lazy"
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+        />
         <div className="absolute inset-0 ring-0 group-hover:ring-2 group-hover:ring-primary transition-all rounded-[4px]" />
       </div>
       <div className="pt-2.5">
