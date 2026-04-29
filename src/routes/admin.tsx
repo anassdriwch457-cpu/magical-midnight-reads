@@ -45,6 +45,7 @@ function AdminPage() {
     if (canViewAnalytics) t.push("analytics");
     if (canManageContent) t.push("content");
     if (canManageUsers) t.push("users");
+    if (canViewAnalytics) t.push("finance");
     return t;
   }, [canViewAnalytics, canManageContent, canManageUsers]);
 
@@ -84,7 +85,7 @@ ON CONFLICT DO NOTHING;`}</code></pre>
   );
 
   return (
-    <div className="pt-20 min-h-screen bg-background">
+    <div className="pt-20 min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <div className="flex">
         <AdminSidebar
           tab={tab}
@@ -97,6 +98,7 @@ ON CONFLICT DO NOTHING;`}</code></pre>
           {tab === "analytics" && <AnalyticsView />}
           {tab === "content" && <ContentView />}
           {tab === "users" && <UsersView canEditRoles={isSuperAdmin} />}
+          {tab === "finance" && <FinanceView />}
         </div>
       </div>
     </div>
