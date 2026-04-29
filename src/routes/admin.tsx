@@ -161,97 +161,166 @@ function MobileTabs({ tab, setTab, allowedTabs }: { tab: Tab | null; setTab: (t:
   );
 }
 
-/* ---------------------- ANALYTICS ---------------------- */
+/* ---------------------- ANALYTICS / DASHBOARD ---------------------- */
+type RevenueDay = { day: string; revenue: number; unlocks: number };
+type GrowthDay = { day: string; signups: number };
+
 function AnalyticsView() {
   const [totalSales, setTotalSales] = useState<number | null>(null);
   const [topSeries, setTopSeries] = useState<{ series_id: string; title: string; cover_url: string | null; unlocks: number; revenue: number }[]>([]);
-  const [growth7, setGrowth7] = useState<number>(0);
-  const [growth30, setGrowth30] = useState<number>(0);
-  const [growthSeries, setGrowthSeries] = useState<{ day: string; signups: number }[]>([]);
+  const [growth7, setGrowth7] = useState(0);
+  const [growth30, setGrowth30] = useState(0);
+  const [growthSeries, setGrowthSeries] = useState<GrowthDay[]>([]);
+  const [revenueSeries, setRevenueSeries] = useState<RevenueDay[]>([]);
+  const [revenue7, setRevenue7] = useState(0);
+  const [unlocks7, setUnlocks7] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [sales, top, growth] = await Promise.all([
+      const [sales, top, growth, revenue] = await Promise.all([
         supabase.rpc("admin_total_sales"),
         supabase.rpc("admin_top_series", { _limit: 10 }),
         supabase.rpc("admin_user_growth", { _days: 30 }),
+        supabase.rpc("admin_revenue_daily", { _days: 30 }),
       ]);
       if (sales.error) toast.error(sales.error.message); else setTotalSales(Number(sales.data ?? 0));
       if (top.error) toast.error(top.error.message); else setTopSeries((top.data ?? []) as never);
       if (growth.error) toast.error(growth.error.message);
       else {
-        const days = (growth.data ?? []) as { day: string; signups: number }[];
+        const days = ((growth.data ?? []) as GrowthDay[]).map(d => ({ ...d, signups: Number(d.signups) }));
         setGrowthSeries(days);
-        setGrowth30(days.reduce((a, d) => a + Number(d.signups), 0));
-        setGrowth7(days.slice(-7).reduce((a, d) => a + Number(d.signups), 0));
+        setGrowth30(days.reduce((a, d) => a + d.signups, 0));
+        setGrowth7(days.slice(-7).reduce((a, d) => a + d.signups, 0));
+      }
+      if (revenue.error) toast.error(revenue.error.message);
+      else {
+        const days = ((revenue.data ?? []) as RevenueDay[]).map(d => ({
+          ...d,
+          revenue: Number(d.revenue),
+          unlocks: Number(d.unlocks),
+        }));
+        setRevenueSeries(days);
+        const last7 = days.slice(-7);
+        setRevenue7(last7.reduce((a, d) => a + d.revenue, 0));
+        setUnlocks7(last7.reduce((a, d) => a + d.unlocks, 0));
       }
       setLoading(false);
     })();
   }, []);
 
-  if (loading) return <p className="text-muted-foreground">Loading analytics…</p>;
+  if (loading) return <p className="text-muted-foreground">Loading dashboard…</p>;
 
-  const maxBar = Math.max(1, ...growthSeries.map(d => Number(d.signups)));
+  // merge growth & revenue by day for combined chart
+  const combined = revenueSeries.map((r) => {
+    const g = growthSeries.find((s) => s.day === r.day);
+    return {
+      day: r.day.slice(5), // MM-DD
+      revenue: r.revenue,
+      unlocks: r.unlocks,
+      signups: g ? g.signups : 0,
+    };
+  });
 
   return (
     <div>
-      <SectionHeader icon={BarChart3} title="Analytics" subtitle="Sales, top content, and growth" />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <StatCard icon={Coins} label="Total Coins Spent" value={totalSales?.toLocaleString() ?? "0"} accent />
-        <StatCard icon={TrendingUp} label="New Users (7d)" value={growth7.toLocaleString()} />
-        <StatCard icon={UsersIcon} label="New Users (30d)" value={growth30.toLocaleString()} />
+      <SectionHeader icon={BarChart3} title="Dashboard" subtitle="Real-time revenue, growth, and engagement" />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <StatCard icon={Coins} label="Revenue (7d)" value={`${revenue7.toLocaleString()} ¢`} accent />
+        <StatCard icon={BookOpen} label="Unlocks (7d)" value={unlocks7.toLocaleString()} />
+        <StatCard icon={UsersIcon} label="New Users (7d)" value={growth7.toLocaleString()} />
+        <StatCard icon={TrendingUp} label="All-time Coins" value={totalSales?.toLocaleString() ?? "0"} />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="rounded-lg border border-border bg-card p-5">
-          <h3 className="font-bold uppercase tracking-wider text-sm mb-4">Top Series by Unlocks</h3>
-          {topSeries.length === 0 ? <p className="text-sm text-muted-foreground">No unlocks yet.</p> :
-            <ol className="space-y-3">
-              {topSeries.map((s, i) => (
-                <li key={s.series_id} className="flex items-center gap-3">
-                  <span className="text-xs font-mono text-muted-foreground w-5">{i + 1}</span>
-                  {s.cover_url
-                    ? <img src={s.cover_url} alt="" className="h-10 w-7 object-cover rounded-sm" />
-                    : <div className="h-10 w-7 rounded-sm bg-muted" />}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold truncate">{s.title}</div>
-                    <div className="text-xs text-muted-foreground">{Number(s.unlocks)} unlocks · {Number(s.revenue).toLocaleString()} coins</div>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          }
-        </div>
+      <div className="grid lg:grid-cols-2 gap-6 mb-6">
+        <GlassCard title="Revenue (last 30 days)" subtitle={`${revenue30Total(revenueSeries).toLocaleString()} coins total`}>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={combined} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.55} />
+                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+              <Tooltip contentStyle={chartTooltip} cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }} />
+              <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#revFill)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </GlassCard>
 
-        <div className="rounded-lg border border-border bg-card p-5">
-          <h3 className="font-bold uppercase tracking-wider text-sm mb-4">Sign-ups (last 30 days)</h3>
-          <div className="flex items-end gap-1 h-40">
-            {growthSeries.map(d => (
-              <div key={d.day} className="flex-1 flex flex-col items-center gap-1" title={`${d.day}: ${d.signups}`}>
-                <div
-                  className="w-full bg-primary/80 rounded-sm"
-                  style={{ height: `${(Number(d.signups) / maxBar) * 100}%`, minHeight: 2 }}
-                />
-              </div>
+        <GlassCard title="Growth & Unlocks (30d)" subtitle="Signups vs chapter unlocks">
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={combined} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+              <Tooltip contentStyle={chartTooltip} cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }} />
+              <Bar dataKey="signups" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="unlocks" fill="hsl(var(--muted-foreground))" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-primary inline-block" /> Signups</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-muted-foreground inline-block" /> Unlocks</span>
+          </div>
+        </GlassCard>
+      </div>
+
+      <GlassCard title="Top Series by Unlocks">
+        {topSeries.length === 0 ? <p className="text-sm text-muted-foreground">No unlocks yet.</p> :
+          <ol className="space-y-3">
+            {topSeries.map((s, i) => (
+              <li key={s.series_id} className="flex items-center gap-3">
+                <span className="text-xs font-mono text-muted-foreground w-5">{i + 1}</span>
+                {s.cover_url
+                  ? <img src={s.cover_url} alt="" className="h-10 w-7 object-cover rounded-sm" />
+                  : <div className="h-10 w-7 rounded-sm bg-muted" />}
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold truncate">{s.title}</div>
+                  <div className="text-xs text-muted-foreground">{Number(s.unlocks)} unlocks · {Number(s.revenue).toLocaleString()} coins</div>
+                </div>
+              </li>
             ))}
-          </div>
-          <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
-            <span>{growthSeries[0]?.day.slice(5)}</span>
-            <span>{growthSeries.at(-1)?.day.slice(5)}</span>
-          </div>
-        </div>
+          </ol>
+        }
+      </GlassCard>
+    </div>
+  );
+}
+
+const chartTooltip = {
+  background: "hsl(var(--card))",
+  border: "1px solid hsl(var(--border))",
+  borderRadius: 6,
+  fontSize: 12,
+};
+
+function revenue30Total(days: RevenueDay[]) {
+  return days.reduce((a, d) => a + Number(d.revenue), 0);
+}
+
+function GlassCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-xl p-5 shadow-xl shadow-black/5">
+      <div className="mb-4">
+        <h3 className="font-bold uppercase tracking-wider text-sm">{title}</h3>
+        {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
       </div>
+      {children}
     </div>
   );
 }
 
 function StatCard({ icon: Icon, label, value, accent }: { icon: typeof Coins; label: string; value: string; accent?: boolean }) {
   return (
-    <div className={`rounded-lg border p-5 ${accent ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
+    <div className={`rounded-xl border backdrop-blur-xl p-5 shadow-lg transition-all hover:scale-[1.02] ${accent ? "border-primary/40 bg-gradient-to-br from-primary/10 to-primary/5 shadow-primary/10" : "border-border/50 bg-card/40 shadow-black/5"}`}>
       <div className="flex items-center justify-between">
-        <span className="text-xs uppercase tracking-widest text-muted-foreground">{label}</span>
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{label}</span>
         <Icon className={`h-4 w-4 ${accent ? "text-primary" : "text-muted-foreground"}`} />
       </div>
       <div className={`mt-2 text-2xl font-extrabold tabular-nums ${accent ? "text-primary" : ""}`}>{value}</div>
