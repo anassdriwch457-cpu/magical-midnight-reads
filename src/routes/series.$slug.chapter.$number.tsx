@@ -250,7 +250,7 @@ function ReaderPage() {
 
   const renderBottomBar = () => (
     <div
-      className={`fixed bottom-0 inset-x-0 z-40 bg-gradient-to-t from-black/95 to-transparent transition-opacity duration-300 ${showUI ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      className={`fixed bottom-0 inset-x-0 z-40 bg-gradient-to-t from-black/95 to-transparent backdrop-blur-md transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
     >
       <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-2">
         {siblings.prev !== undefined ? (
@@ -341,9 +341,11 @@ function ReaderPage() {
   }
 
   return (
-    <div className="fixed inset-0 bg-black overflow-y-auto z-30">
+    <div ref={scrollerRef} className="fixed inset-0 bg-black overflow-y-auto z-30 [scroll-behavior:smooth]">
+      {renderProgressBar()}
       {renderTopBar()}
-      <div className={`${series.type === "manga" ? "max-w-3xl mx-auto" : "max-w-2xl mx-auto px-4"} pt-20 pb-24`}>
+      {renderCinemaExit()}
+      <div className={`${series.type === "manga" ? "max-w-3xl mx-auto" : "max-w-2xl mx-auto px-4"} ${cinematic ? "pt-2 pb-2" : "pt-20 pb-24"}`}>
         {series.type === "manga" ? (
           pagesLoading ? (
             <div className="flex items-center justify-center py-20">
@@ -366,7 +368,18 @@ function ReaderPage() {
               </div>
             </div>
           ) : (
-            pages.map(p => <img key={p.id} src={p.image_url} alt={`Page ${p.page_number}`} loading="lazy" className="w-full block" />)
+            pages.map((p, i) => (
+              <img
+                key={p.id}
+                src={p.image_url}
+                alt={`Page ${p.page_number}`}
+                loading={i < 2 ? "eager" : "lazy"}
+                decoding="async"
+                fetchPriority={i < 2 ? "high" : "low"}
+                draggable={false}
+                className="w-full block select-none [content-visibility:auto] [contain-intrinsic-size:1200px]"
+              />
+            ))
           )
         ) : (
           <article className="prose prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-base text-white/90">
