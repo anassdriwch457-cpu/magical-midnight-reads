@@ -3,11 +3,14 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { SeriesCard } from "@/components/series-card";
+import { LatestUpdateCard } from "@/components/latest-update-card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { GenreBar } from "@/components/genre-bar";
 
 type Series = Tables<"series">;
+type Chapter = Tables<"chapters">;
+type LatestEntry = { series: Series; chapters: Chapter[] };
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -23,7 +26,7 @@ function HomePage() {
   const [trending, setTrending] = useState<Series[]>([]);
   const [popular, setPopular] = useState<Series[]>([]);
   const [novels, setNovels] = useState<Series[]>([]);
-  const [latest, setLatest] = useState<Series[]>([]);
+  const [latest, setLatest] = useState<LatestEntry[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -31,12 +34,28 @@ function HomePage() {
         supabase.from("series").select("*").eq("is_trending", true).limit(5),
         supabase.from("series").select("*").eq("is_popular", true).eq("type", "manga").limit(12),
         supabase.from("series").select("*").eq("type", "novel").order("updated_at", { ascending: false }).limit(12),
-        supabase.from("series").select("*").order("created_at", { ascending: false }).limit(12),
+        supabase.from("series").select("*").order("updated_at", { ascending: false }).limit(12),
       ]);
       setTrending(t.data ?? []);
       setPopular(p.data ?? []);
       setNovels(n.data ?? []);
-      setLatest(l.data ?? []);
+
+      const seriesList = l.data ?? [];
+      if (seriesList.length) {
+        const ids = seriesList.map((s) => s.id);
+        const { data: ch } = await supabase
+          .from("chapters")
+          .select("*")
+          .in("series_id", ids)
+          .order("number", { ascending: false });
+        const byId = new Map<string, Chapter[]>();
+        (ch ?? []).forEach((c) => {
+          const arr = byId.get(c.series_id) ?? [];
+          if (arr.length < 4) arr.push(c);
+          byId.set(c.series_id, arr);
+        });
+        setLatest(seriesList.map((s) => ({ series: s, chapters: byId.get(s.id) ?? [] })));
+      }
     })();
   }, []);
 
@@ -44,12 +63,34 @@ function HomePage() {
     <div className="min-h-screen pb-20">
       <Hero items={trending} />
       <GenreBar />
-      <div className="container mx-auto px-4 space-y-12 mt-10">
-        <Section title="Latest Updates" items={latest} />
+      <div className="container mx-auto px-4 space-y-14 mt-10">
+        <LatestUpdatesSection items={latest} />
         <Section title="Top Rated Manga" items={popular} />
         <Section title="Latest Novels" items={novels} />
       </div>
     </div>
+  );
+}
+
+function LatestUpdatesSection({ items }: { items: LatestEntry[] }) {
+  if (!items.length) return null;
+  return (
+    <section>
+      <div className="flex items-end justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <span className="block h-6 w-1 bg-primary rounded-sm" />
+          <h2 className="text-xl md:text-2xl font-extrabold tracking-tight uppercase">Latest Updates</h2>
+        </div>
+        <Link to="/browse" className="text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-primary">
+          View All →
+        </Link>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {items.map((entry) => (
+          <LatestUpdateCard key={entry.series.id} series={entry.series} chapters={entry.chapters} />
+        ))}
+      </div>
+    </section>
   );
 }
 
