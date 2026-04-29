@@ -137,7 +137,6 @@ function ReaderPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [slug, number, user?.id]);
 
-  // Auto-hide UI after 2.5s of no movement
   useEffect(() => {
     if (!unlocked) return;
     const reveal = () => {
@@ -146,14 +145,15 @@ function ReaderPage() {
       hideTimer.current = setTimeout(() => setShowUI(false), 2500);
     };
     reveal();
+    const scroller = scrollerRef.current;
     window.addEventListener("mousemove", reveal);
-    window.addEventListener("scroll", reveal, { passive: true });
     window.addEventListener("touchstart", reveal, { passive: true });
+    scroller?.addEventListener("scroll", reveal, { passive: true });
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current);
       window.removeEventListener("mousemove", reveal);
-      window.removeEventListener("scroll", reveal);
       window.removeEventListener("touchstart", reveal);
+      scroller?.removeEventListener("scroll", reveal);
     };
   }, [unlocked]);
 
