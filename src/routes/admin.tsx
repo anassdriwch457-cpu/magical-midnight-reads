@@ -15,7 +15,8 @@ import { Progress } from "@/components/ui/progress";
 import {
   Shield, Plus, Pencil, Trash2, Upload, ArrowLeft, BookOpen, Image as ImageIcon,
   BarChart3, Library, Users as UsersIcon, Coins, TrendingUp, Crown, Ban, CheckCircle2,
-  Receipt, ArrowDownRight, ArrowUpRight,
+  Receipt, ArrowDownRight, ArrowUpRight, Settings as SettingsIcon, LayoutGrid, Rows3,
+  Sparkles, Flame, Save,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -28,7 +29,7 @@ type Chapter = Tables<"chapters">;
 
 const ALL_GENRES = ["Action","Adventure","Comedy","Drama","Fantasy","Josei","Magic","Mystery","Romance","School Life","Shoujo","Shounen Ai","Supernatural","Yaoi","Yuri"];
 
-type Tab = "analytics" | "content" | "users" | "finance";
+type Tab = "analytics" | "content" | "users" | "finance" | "settings";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -46,8 +47,9 @@ function AdminPage() {
     if (canManageContent) t.push("content");
     if (canManageUsers) t.push("users");
     if (canViewAnalytics) t.push("finance");
+    if (isSuperAdmin || isManager) t.push("settings");
     return t;
-  }, [canViewAnalytics, canManageContent, canManageUsers]);
+  }, [canViewAnalytics, canManageContent, canManageUsers, isSuperAdmin, isManager]);
 
   const [tab, setTab] = useState<Tab | null>(null);
 
@@ -99,6 +101,7 @@ ON CONFLICT DO NOTHING;`}</code></pre>
           {tab === "content" && <ContentView />}
           {tab === "users" && <UsersView canEditRoles={isSuperAdmin} />}
           {tab === "finance" && <FinanceView />}
+          {tab === "settings" && <SettingsView />}
         </div>
       </div>
     </div>
@@ -117,6 +120,7 @@ function AdminSidebar({ tab, setTab, allowedTabs, roleLabel }: {
     { key: "content", label: "Library", icon: Library },
     { key: "users", label: "Users", icon: UsersIcon },
     { key: "finance", label: "Finance", icon: Receipt },
+    { key: "settings", label: "Settings", icon: SettingsIcon },
   ];
   return (
     <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border/40 bg-card/30 backdrop-blur-xl min-h-[calc(100vh-5rem)] p-4 gap-1 supports-[backdrop-filter]:bg-card/20">
@@ -356,12 +360,17 @@ function ContentView() {
 function SeriesList({ onEdit, onChapters, onNew }: { onEdit: (id: string) => void; onChapters: (id: string) => void; onNew: () => void }) {
   const [items, setItems] = useState<Series[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
     const { data, error } = await supabase.from("series").select("*").order("created_at", { ascending: false });
     if (error) toast.error(error.message);
     setItems(data ?? []);
+    setSelected(new Set());
     setLoading(false);
   };
 
@@ -375,21 +384,125 @@ function SeriesList({ onEdit, onChapters, onNew }: { onEdit: (id: string) => voi
     load();
   };
 
+  const toggleSelect = (id: string) => {
+    setSelected(s => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const filtered = items.filter(s => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return s.title.toLowerCase().includes(q) || s.slug.toLowerCase().includes(q);
+  });
+
+  const allVisibleSelected = filtered.length > 0 && filtered.every(s => selected.has(s.id));
+  const toggleAllVisible = () => {
+    setSelected(s => {
+      const next = new Set(s);
+      if (allVisibleSelected) filtered.forEach(f => next.delete(f.id));
+      else filtered.forEach(f => next.add(f.id));
+      return next;
+    });
+  };
+
+  const bulkFlag = async (field: "is_trending" | "is_popular", value: boolean) => {
+    if (selected.size === 0) return toast.error("Nothing selected");
+    setBulkBusy(true);
+    const ids = Array.from(selected);
+    const { data, error } = await supabase.rpc("admin_bulk_update_series_flags", {
+      _ids: ids,
+      _is_trending: field === "is_trending" ? value : undefined,
+      _is_popular: field === "is_popular" ? value : undefined,
+    });
+    setBulkBusy(false);
+    if (error) return toast.error(error.message);
+    const res = data as { success: boolean; updated?: number; error?: string };
+    if (!res.success) return toast.error(res.error ?? "Failed");
+    toast.success(`Updated ${res.updated} series`);
+    load();
+  };
+
+  const bulkDelete = async () => {
+    if (selected.size === 0) return toast.error("Nothing selected");
+    if (!confirm(`Delete ${selected.size} series and all their chapters? This cannot be undone.`)) return;
+    setBulkBusy(true);
+    const { error } = await supabase.from("series").delete().in("id", Array.from(selected));
+    setBulkBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success(`Deleted ${selected.size}`);
+    load();
+  };
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <SectionHeader icon={Library} title="Series Library" subtitle={`${items.length} title${items.length === 1 ? "" : "s"}`} />
         <Button onClick={onNew} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
           <Plus className="h-4 w-4" /> New Series
         </Button>
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <Input placeholder="Search title or slug…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+        <div className="flex gap-1 rounded-md border border-border/50 bg-card/40 backdrop-blur-xl p-1 ml-auto">
+          <button onClick={() => setView("grid")} className={`p-1.5 rounded ${view === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`} title="Grid view"><LayoutGrid className="h-4 w-4" /></button>
+          <button onClick={() => setView("list")} className={`p-1.5 rounded ${view === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`} title="List view"><Rows3 className="h-4 w-4" /></button>
+        </div>
+      </div>
+
+      {selected.size > 0 && (
+        <div className="rounded-xl border border-primary/40 bg-gradient-to-r from-primary/15 to-primary/5 backdrop-blur-xl p-3 mb-4 flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-bold mr-2">{selected.size} selected</span>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkFlag("is_trending", true)}><Flame className="h-3.5 w-3.5" /> Mark Trending</Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkFlag("is_trending", false)}>Untrending</Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkFlag("is_popular", true)}><Sparkles className="h-3.5 w-3.5" /> Mark Popular</Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkFlag("is_popular", false)}>Unpopular</Button>
+          <Button size="sm" variant="destructive" disabled={bulkBusy} onClick={bulkDelete} className="ml-auto"><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
+        </div>
+      )}
+
       {loading ? <p className="text-muted-foreground py-8 text-center">Loading…</p> :
-        items.length === 0 ? <p className="text-muted-foreground py-8 text-center">No series yet. Create your first one.</p> :
-        <div className="rounded-md border border-border overflow-hidden">
+        filtered.length === 0 ? <p className="text-muted-foreground py-8 text-center">{search ? "No matches." : "No series yet. Create your first one."}</p> :
+        view === "grid" ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {filtered.map(s => {
+              const sel = selected.has(s.id);
+              return (
+                <div key={s.id} className={`group relative rounded-xl overflow-hidden border backdrop-blur-xl transition-all ${sel ? "border-primary ring-2 ring-primary/40" : "border-border/50 bg-card/40 hover:border-primary/40"}`}>
+                  <button onClick={() => toggleSelect(s.id)} className="absolute top-2 left-2 z-10 h-6 w-6 rounded-md bg-background/80 backdrop-blur border border-border/60 flex items-center justify-center" aria-label="Select">
+                    <div className={`h-3.5 w-3.5 rounded-sm ${sel ? "bg-primary" : "bg-transparent border border-border"}`} />
+                  </button>
+                  <div className="absolute top-2 right-2 z-10 flex gap-1">
+                    {s.is_trending && <span title="Trending" className="h-6 w-6 rounded-md bg-orange-500/90 text-white flex items-center justify-center"><Flame className="h-3.5 w-3.5" /></span>}
+                    {s.is_popular && <span title="Popular" className="h-6 w-6 rounded-md bg-primary/90 text-primary-foreground flex items-center justify-center"><Sparkles className="h-3.5 w-3.5" /></span>}
+                  </div>
+                  <div className="aspect-[2/3] bg-muted overflow-hidden">
+                    {s.cover_url ? <img src={s.cover_url} alt={s.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform" /> :
+                      <div className="h-full w-full flex items-center justify-center"><ImageIcon className="h-8 w-8 text-muted-foreground" /></div>}
+                  </div>
+                  <div className="p-2.5">
+                    <div className="font-bold text-sm truncate">{s.title}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.type} · {s.status}</div>
+                    <div className="flex gap-1 mt-2">
+                      <Button size="sm" variant="ghost" className="h-7 px-1.5" onClick={() => onChapters(s.id)} title="Chapters"><BookOpen className="h-3.5 w-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="h-7 px-1.5" onClick={() => onEdit(s.id)} title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="h-7 px-1.5 ml-auto text-destructive hover:text-destructive" onClick={() => remove(s.id, s.title)} title="Delete"><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+        <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-xl overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-card text-xs uppercase tracking-wider text-muted-foreground">
+            <thead className="bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
+                <th className="px-3 py-3 w-8"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} /></th>
                 <th className="text-left px-4 py-3">Title</th>
                 <th className="text-left px-4 py-3 hidden md:table-cell">Type</th>
                 <th className="text-left px-4 py-3 hidden md:table-cell">Status</th>
@@ -397,13 +510,17 @@ function SeriesList({ onEdit, onChapters, onNew }: { onEdit: (id: string) => voi
               </tr>
             </thead>
             <tbody>
-              {items.map(s => (
-                <tr key={s.id} className="border-t border-border hover:bg-card/50">
+              {filtered.map(s => (
+                <tr key={s.id} className="border-t border-border/40 hover:bg-card/60">
+                  <td className="px-3 py-3"><input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelect(s.id)} /></td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       {s.cover_url && <img src={s.cover_url} alt="" className="h-12 w-9 object-cover rounded-sm" />}
                       <div>
-                        <div className="font-bold">{s.title}</div>
+                        <div className="font-bold flex items-center gap-1.5">{s.title}
+                          {s.is_trending && <Flame className="h-3 w-3 text-orange-500" />}
+                          {s.is_popular && <Sparkles className="h-3 w-3 text-primary" />}
+                        </div>
                         <div className="text-xs text-muted-foreground">/{s.slug}</div>
                       </div>
                     </div>
@@ -422,6 +539,7 @@ function SeriesList({ onEdit, onChapters, onNew }: { onEdit: (id: string) => voi
             </tbody>
           </table>
         </div>
+        )
       }
     </div>
   );
@@ -767,6 +885,8 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
           </Button>
         </div>
       </div>
+
+      <MassPriceTool seriesId={seriesId} chapterCount={chapters.length} onDone={load} />
 
       <h3 className="font-bold uppercase tracking-wider text-sm mb-3">Chapters</h3>
       {chapters.length === 0 ? <p className="text-muted-foreground text-sm py-6 text-center">No chapters yet.</p> :
@@ -1197,6 +1317,147 @@ function FinanceView() {
           </div>
         </div>
       }
+    </div>
+  );
+}
+
+/* ---------------------- MASS PRICE TOOL ---------------------- */
+function MassPriceTool({ seriesId, chapterCount, onDone }: { seriesId: string; chapterCount: number; onDone: () => void }) {
+  const [price, setPrice] = useState("0");
+  const [busy, setBusy] = useState(false);
+
+  const apply = async () => {
+    const p = Math.max(0, parseInt(price) || 0);
+    if (!confirm(`Set the price of ALL ${chapterCount} chapter(s) to ${p} coin(s)? This cannot be undone.`)) return;
+    setBusy(true);
+    const { data, error } = await supabase.rpc("admin_mass_update_chapter_price", { _series_id: seriesId, _price: p });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    const res = data as { success: boolean; updated?: number; error?: string };
+    if (!res.success) return toast.error(res.error ?? "Failed");
+    toast.success(`Updated ${res.updated} chapter(s) to ${p} coins`);
+    onDone();
+  };
+
+  return (
+    <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl p-5 mb-8">
+      <div className="flex items-start gap-3 mb-3">
+        <Coins className="h-5 w-5 text-primary mt-0.5" />
+        <div>
+          <h3 className="font-bold uppercase tracking-wider text-sm">Mass Price Update</h3>
+          <p className="text-xs text-muted-foreground">Set the same coin price across every chapter in this series.</p>
+        </div>
+      </div>
+      <div className="flex flex-col sm:flex-row gap-3 items-end">
+        <div className="flex-1 w-full sm:w-auto">
+          <Label htmlFor="mass-price">New price (0 = free)</Label>
+          <Input id="mass-price" type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} />
+        </div>
+        <Button onClick={apply} disabled={busy || chapterCount === 0} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
+          {busy ? "Applying…" : `Apply to ${chapterCount} chapters`}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------- SITE SETTINGS ---------------------- */
+type SiteSettings = {
+  site_name: string;
+  seo_description: string;
+  hero_series_id: string | null;
+};
+
+function SettingsView() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [settings, setSettings] = useState<SiteSettings>({ site_name: "", seo_description: "", hero_series_id: null });
+  const [seriesList, setSeriesList] = useState<{ id: string; title: string }[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const [s, list] = await Promise.all([
+        supabase.from("site_settings").select("site_name, seo_description, hero_series_id").eq("id", true).maybeSingle(),
+        supabase.from("series").select("id, title").order("title"),
+      ]);
+      if (s.data) setSettings({
+        site_name: s.data.site_name,
+        seo_description: s.data.seo_description,
+        hero_series_id: s.data.hero_series_id,
+      });
+      if (s.error) toast.error(s.error.message);
+      setSeriesList(list.data ?? []);
+      setLoading(false);
+    })();
+  }, []);
+
+  const save = async () => {
+    if (!settings.site_name.trim()) return toast.error("Site name is required");
+    setSaving(true);
+    // Update singleton row
+    const { error } = await supabase
+      .from("site_settings")
+      .update({
+        site_name: settings.site_name.trim(),
+        seo_description: settings.seo_description.trim(),
+        hero_series_id: settings.hero_series_id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", true);
+    if (error) { setSaving(false); return toast.error(error.message); }
+
+    // Sync hero series flag: clear all, set chosen
+    if (settings.hero_series_id) {
+      await supabase.from("series").update({ is_trending: false }).neq("id", settings.hero_series_id);
+      await supabase.from("series").update({ is_trending: true }).eq("id", settings.hero_series_id);
+    }
+
+    setSaving(false);
+    toast.success("Site settings saved");
+  };
+
+  if (loading) return <p className="text-muted-foreground py-8 text-center">Loading…</p>;
+
+  return (
+    <div className="max-w-2xl">
+      <SectionHeader icon={SettingsIcon} title="Site Settings" subtitle="Brand, SEO, and the hero banner" />
+
+      <div className="space-y-5">
+        <GlassCard title="Branding">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="site_name">Site Name</Label>
+              <Input id="site_name" value={settings.site_name} onChange={(e) => setSettings(s => ({ ...s, site_name: e.target.value }))} placeholder="Nuvia Toon" />
+              <p className="text-xs text-muted-foreground mt-1">Shown across the homepage and SEO meta.</p>
+            </div>
+            <div>
+              <Label htmlFor="seo">SEO Description</Label>
+              <Textarea id="seo" rows={3} value={settings.seo_description} onChange={(e) => setSettings(s => ({ ...s, seo_description: e.target.value }))} />
+              <p className="text-xs text-muted-foreground mt-1">Used as the meta description on the homepage.</p>
+            </div>
+          </div>
+        </GlassCard>
+
+        <GlassCard title="Hero Banner Series" subtitle="Pick the headline series for the homepage hero">
+          <Select
+            value={settings.hero_series_id ?? "__none__"}
+            onValueChange={(v) => setSettings(s => ({ ...s, hero_series_id: v === "__none__" ? null : v }))}
+          >
+            <SelectTrigger><SelectValue placeholder="No hero" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">— None —</SelectItem>
+              {seriesList.map(s => (
+                <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-2">Saving will mark this series as the only Trending one.</p>
+        </GlassCard>
+
+        <Button onClick={save} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
+          <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save Settings"}
+        </Button>
+      </div>
     </div>
   );
 }
