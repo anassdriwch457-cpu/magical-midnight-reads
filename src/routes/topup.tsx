@@ -20,15 +20,21 @@ export const Route = createFileRoute("/topup")({
 });
 
 function TopupPage() {
-  const { user, wallet, refreshWallet } = useAuth();
+  const { user, session, wallet, refreshWallet } = useAuth();
   const purchase = useServerFn(mockPurchaseCoins);
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   const handleBuy = async (packageId: string) => {
-    if (!user) return;
+    if (!user || !session?.access_token) {
+      toast.error("Please sign in again");
+      return;
+    }
     setPendingId(packageId);
     try {
-      const res = await purchase({ data: { packageId } });
+      const res = await purchase({
+        data: { packageId },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
       if (!res.success) {
         toast.error(res.error ?? "Purchase failed");
         return;
