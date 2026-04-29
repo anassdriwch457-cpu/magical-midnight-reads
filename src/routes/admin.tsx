@@ -15,7 +15,8 @@ import { Progress } from "@/components/ui/progress";
 import {
   Shield, Plus, Pencil, Trash2, Upload, ArrowLeft, BookOpen, Image as ImageIcon,
   BarChart3, Library, Users as UsersIcon, Coins, TrendingUp, Crown, Ban, CheckCircle2,
-  Receipt, ArrowDownRight, ArrowUpRight,
+  Receipt, ArrowDownRight, ArrowUpRight, Settings as SettingsIcon, LayoutGrid, Rows3,
+  Sparkles, Flame, Save,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
