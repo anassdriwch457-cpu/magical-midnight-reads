@@ -4,11 +4,20 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface Wallet { coins: number }
 
+export type Role = "user" | "admin" | "super_admin" | "manager";
+
 interface AuthCtx {
   user: User | null;
   session: Session | null;
   wallet: Wallet | null;
-  isAdmin: boolean;
+  roles: Role[];
+  isAdmin: boolean;          // legacy: any staff role
+  isSuperAdmin: boolean;
+  isManager: boolean;
+  isUploader: boolean;       // 'admin' role only (content uploader)
+  canManageContent: boolean; // super_admin || admin
+  canManageUsers: boolean;   // super_admin || manager
+  canViewAnalytics: boolean; // super_admin || manager
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>;
