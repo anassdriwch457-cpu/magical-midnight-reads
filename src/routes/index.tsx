@@ -30,15 +30,22 @@ function HomePage() {
 
   useEffect(() => {
     (async () => {
-      const [t, p, n, l] = await Promise.all([
+      const [t, p, n, l, settings] = await Promise.all([
         supabase.from("series").select("*").eq("is_trending", true).limit(5),
         supabase.from("series").select("*").eq("is_popular", true).eq("type", "manga").limit(12),
         supabase.from("series").select("*").eq("type", "novel").order("updated_at", { ascending: false }).limit(12),
         supabase.from("series").select("*").order("updated_at", { ascending: false }).limit(12),
+        supabase.from("site_settings").select("site_name, seo_description").eq("id", true).maybeSingle(),
       ]);
       setTrending(t.data ?? []);
       setPopular(p.data ?? []);
       setNovels(n.data ?? []);
+
+      if (settings.data && typeof document !== "undefined") {
+        document.title = `${settings.data.site_name} — Read Manga & Novels Online`;
+        const meta = document.querySelector('meta[name="description"]');
+        if (meta) meta.setAttribute("content", settings.data.seo_description);
+      }
 
       const seriesList = l.data ?? [];
       if (seriesList.length) {
