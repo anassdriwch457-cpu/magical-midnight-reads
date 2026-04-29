@@ -111,6 +111,7 @@ function BrowsePage() {
           <Button variant="outline" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>Next</Button>
         </div>
       )}
+      </div>
     </div>
   );
 }
