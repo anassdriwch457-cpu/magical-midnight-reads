@@ -123,6 +123,7 @@ function AdminSidebar({ tab, setTab, allowedTabs, roleLabel }: {
   const items: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
     { key: "analytics", label: "Dashboard", icon: BarChart3 },
     { key: "content", label: "Library", icon: Library },
+    { key: "migrator", label: "Migrator", icon: Download },
     { key: "users", label: "Users", icon: UsersIcon },
     { key: "finance", label: "Finance", icon: Receipt },
     { key: "payments", label: "Payments", icon: CreditCard },
