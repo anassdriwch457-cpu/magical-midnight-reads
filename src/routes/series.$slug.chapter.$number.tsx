@@ -32,6 +32,9 @@ function ReaderPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [debugMessage, setDebugMessage] = useState<string | null>(null);
   const [showUI, setShowUI] = useState(true);
+  const [cinematic, setCinematic] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = async () => {
