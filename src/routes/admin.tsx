@@ -778,7 +778,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         series_id: seriesId, number: n, title: title.trim() || null, price: p,
         content: series?.type === "novel" ? content.trim() : null,
       }).select().single();
-      if (chErr) throw chErr;
+      if (chErr) { console.error("[chapters insert]", chErr); throw chErr; }
 
       if (series?.type === "manga" && zipFile) {
         const zip = await JSZip.loadAsync(zipFile);
@@ -799,7 +799,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
           const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : ext === "gif" ? "image/gif" : ext === "avif" ? "image/avif" : "image/jpeg";
           const path = `series/${seriesId}/ch-${n}/${String(i + 1).padStart(3, "0")}.${ext}`;
           const { error: upErr } = await supabase.storage.from("chapter-images").upload(path, blob, { upsert: true, contentType });
-          if (upErr) throw upErr;
+          if (upErr) { console.error("[storage upload]", path, upErr); throw new Error(`Storage upload failed: ${upErr.message}`); }
           const { data: { publicUrl } } = supabase.storage.from("chapter-images").getPublicUrl(path);
           pageRows.push({ chapter_id: ch.id, page_number: i + 1, image_url: publicUrl });
         }
@@ -808,7 +808,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         const BATCH = 50;
         for (let i = 0; i < pageRows.length; i += BATCH) {
           const { error: pErr } = await supabase.from("chapter_pages").insert(pageRows.slice(i, i + BATCH));
-          if (pErr) throw pErr;
+          if (pErr) { console.error("[chapter_pages insert]", pErr); throw pErr; }
         }
       }
 
