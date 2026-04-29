@@ -29,7 +29,7 @@ type Chapter = Tables<"chapters">;
 
 const ALL_GENRES = ["Action","Adventure","Comedy","Drama","Fantasy","Josei","Magic","Mystery","Romance","School Life","Shoujo","Shounen Ai","Supernatural","Yaoi","Yuri"];
 
-type Tab = "analytics" | "content" | "users" | "finance";
+type Tab = "analytics" | "content" | "users" | "finance" | "settings";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
