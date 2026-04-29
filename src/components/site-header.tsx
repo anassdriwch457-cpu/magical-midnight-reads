@@ -7,6 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Coins, Sparkles, Moon, Square, User, LogOut, Shield, Palette, Search, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/nuvia-logo.png";
+import { resolveImage, onImageError } from "@/lib/image";
 
 type SearchHit = { id: string; title: string; slug: string; cover_url: string | null; type: string };
 
