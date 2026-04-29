@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Coins, Lock } from "lucide-react";
+import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Coins, Lock, Maximize2, Minimize2 } from "lucide-react";
 import { toast } from "sonner";
 
 type Chapter = Tables<"chapters">;
@@ -32,6 +32,9 @@ function ReaderPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [debugMessage, setDebugMessage] = useState<string | null>(null);
   const [showUI, setShowUI] = useState(true);
+  const [cinematic, setCinematic] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = async () => {
@@ -134,7 +137,6 @@ function ReaderPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [slug, number, user?.id]);
 
-  // Auto-hide UI after 2.5s of no movement
   useEffect(() => {
     if (!unlocked) return;
     const reveal = () => {
@@ -143,16 +145,37 @@ function ReaderPage() {
       hideTimer.current = setTimeout(() => setShowUI(false), 2500);
     };
     reveal();
+    const scroller = scrollerRef.current;
     window.addEventListener("mousemove", reveal);
-    window.addEventListener("scroll", reveal, { passive: true });
     window.addEventListener("touchstart", reveal, { passive: true });
+    scroller?.addEventListener("scroll", reveal, { passive: true });
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current);
       window.removeEventListener("mousemove", reveal);
-      window.removeEventListener("scroll", reveal);
       window.removeEventListener("touchstart", reveal);
+      scroller?.removeEventListener("scroll", reveal);
     };
   }, [unlocked]);
+
+  // Track scroll progress through the chapter
+  useEffect(() => {
+    if (!unlocked) return;
+    const el = scrollerRef.current;
+    if (!el) return;
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const max = el.scrollHeight - el.clientHeight;
+        setProgress(max > 0 ? Math.min(100, (el.scrollTop / max) * 100) : 0);
+      });
+    };
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => { cancelAnimationFrame(raf); el.removeEventListener("scroll", onScroll); };
+  }, [unlocked, pages.length]);
+
+  // Auto-enter cinematic on touch devices? keep manual.
 
   const handleUnlock = async () => {
     if (!user) { navigate({ to: "/auth" }); return; }
@@ -176,25 +199,58 @@ function ReaderPage() {
     await load();
   };
 
+  const uiVisible = showUI && !cinematic;
+
   const renderTopBar = () => (
     <div
-      className={`fixed top-0 inset-x-0 z-40 bg-gradient-to-b from-black/90 to-transparent transition-opacity duration-300 ${showUI ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      className={`fixed top-0 inset-x-0 z-40 transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
     >
-      <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-        <Link to="/series/$slug" params={{ slug }} className="flex items-center gap-2 text-sm text-white/90 hover:text-primary">
-          <ArrowLeft className="h-4 w-4" />
-          <span className="font-bold truncate max-w-[40vw]">{series?.title ?? "Back to Series"}</span>
-        </Link>
-        <div className="text-xs uppercase tracking-wider text-white/70 font-bold">
-          {chapter ? `CH ${Number(chapter.number)}${chapter.title ? ` · ${chapter.title}` : ""}` : `CH ${number}`}
+      <div className="bg-gradient-to-b from-black/90 to-transparent backdrop-blur-md">
+        <div className="container mx-auto px-4 h-14 flex items-center justify-between gap-3">
+          <Link to="/series/$slug" params={{ slug }} className="flex items-center gap-2 text-sm text-white/90 hover:text-primary min-w-0">
+            <ArrowLeft className="h-4 w-4 shrink-0" />
+            <span className="font-bold truncate max-w-[40vw]">{series?.title ?? "Back to Series"}</span>
+          </Link>
+          <div className="text-xs uppercase tracking-wider text-white/70 font-bold truncate hidden sm:block">
+            {chapter ? `CH ${Number(chapter.number)}${chapter.title ? ` · ${chapter.title}` : ""}` : `CH ${number}`}
+          </div>
+          <button
+            onClick={() => setCinematic(c => !c)}
+            aria-label={cinematic ? "Exit cinematic mode" : "Enter cinematic mode"}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white transition-colors"
+          >
+            {cinematic ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">{cinematic ? "Exit" : "Cinema"}</span>
+          </button>
         </div>
       </div>
     </div>
   );
 
+  const renderProgressBar = () => (
+    <div className="fixed top-0 inset-x-0 z-50 h-0.5 bg-white/5 pointer-events-none">
+      <div
+        className="h-full bg-gradient-to-r from-primary to-primary/70 transition-[width] duration-150 ease-out shadow-[0_0_8px_var(--neon-purple)]"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  );
+
+  const renderCinemaExit = () => (
+    cinematic && (
+      <button
+        onClick={() => setCinematic(false)}
+        aria-label="Exit cinematic mode"
+        className="fixed top-3 right-3 z-50 inline-flex items-center justify-center h-9 w-9 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur transition-colors"
+      >
+        <Minimize2 className="h-4 w-4" />
+      </button>
+    )
+  );
+
   const renderBottomBar = () => (
     <div
-      className={`fixed bottom-0 inset-x-0 z-40 bg-gradient-to-t from-black/95 to-transparent transition-opacity duration-300 ${showUI ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      className={`fixed bottom-0 inset-x-0 z-40 bg-gradient-to-t from-black/95 to-transparent backdrop-blur-md transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
     >
       <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-2">
         {siblings.prev !== undefined ? (
@@ -285,9 +341,11 @@ function ReaderPage() {
   }
 
   return (
-    <div className="fixed inset-0 bg-black overflow-y-auto z-30">
+    <div ref={scrollerRef} className="fixed inset-0 bg-black overflow-y-auto z-30 [scroll-behavior:smooth]">
+      {renderProgressBar()}
       {renderTopBar()}
-      <div className={`${series.type === "manga" ? "max-w-3xl mx-auto" : "max-w-2xl mx-auto px-4"} pt-20 pb-24`}>
+      {renderCinemaExit()}
+      <div className={`${series.type === "manga" ? "max-w-3xl mx-auto" : "max-w-2xl mx-auto px-4"} ${cinematic ? "pt-2 pb-2" : "pt-20 pb-24"}`}>
         {series.type === "manga" ? (
           pagesLoading ? (
             <div className="flex items-center justify-center py-20">
@@ -310,7 +368,18 @@ function ReaderPage() {
               </div>
             </div>
           ) : (
-            pages.map(p => <img key={p.id} src={p.image_url} alt={`Page ${p.page_number}`} loading="lazy" className="w-full block" />)
+            pages.map((p, i) => (
+              <img
+                key={p.id}
+                src={p.image_url}
+                alt={`Page ${p.page_number}`}
+                loading={i < 2 ? "eager" : "lazy"}
+                decoding="async"
+                fetchPriority={i < 2 ? "high" : "low"}
+                draggable={false}
+                className="w-full block select-none [content-visibility:auto] [contain-intrinsic-size:1200px]"
+              />
+            ))
           )
         ) : (
           <article className="prose prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-base text-white/90">

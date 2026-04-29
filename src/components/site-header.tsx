@@ -5,6 +5,7 @@ import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Coins, Sparkles, Moon, Square, User, LogOut, Shield, Palette, Search, X } from "lucide-react";
+import { CoinBadge } from "@/components/coin-badge";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/nuvia-logo.png";
 import { resolveImage, onImageError } from "@/lib/image";
@@ -73,8 +74,8 @@ export function SiteHeader() {
     <header
       className={`fixed top-0 z-40 w-full transition-all duration-300 ${
         scrolled
-          ? "bg-background/95 backdrop-blur-md border-b border-border/60"
-          : "bg-gradient-to-b from-black/70 to-transparent border-b border-transparent"
+          ? "glass-strong border-b border-white/10 shadow-[0_4px_20px_-12px_rgba(0,0,0,0.6)]"
+          : "bg-gradient-to-b from-black/70 via-black/30 to-transparent backdrop-blur-sm border-b border-transparent"
       }`}
     >
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -201,10 +202,7 @@ export function SiteHeader() {
 
           {user ? (
             <>
-              <Link to="/topup" className="hidden sm:flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/15 transition-colors">
-                <Coins className="h-4 w-4 text-[var(--coin)]" />
-                <span className="font-semibold tabular-nums">{wallet?.coins ?? 0}</span>
-              </Link>
+              <CoinBadge coins={wallet?.coins ?? 0} />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-white/10"><User className="h-[18px] w-[18px]" /></Button>

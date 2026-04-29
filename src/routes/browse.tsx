@@ -5,6 +5,8 @@ import type { Tables } from "@/integrations/supabase/types";
 import { SeriesCard } from "@/components/series-card";
 import { Button } from "@/components/ui/button";
 import { GenreBar } from "@/components/genre-bar";
+import { EmptyState } from "@/components/empty-state";
+import { SearchX } from "lucide-react";
 
 type Series = Tables<"series">;
 const PAGE_SIZE = 18;
@@ -85,13 +87,26 @@ function BrowsePage() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-3 gap-y-6">
-            {Array.from({ length: 12 }).map((_, i) => <div key={i} className="aspect-[2/3] rounded-[4px] bg-muted animate-pulse" />)}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+            {Array.from({ length: 12 }).map((_, i) => <div key={i} className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />)}
           </div>
         ) : items.length === 0 ? (
-          <div className="text-center py-20 text-muted-foreground">No series match your filters.</div>
+          <EmptyState
+            icon={<SearchX className="h-9 w-9" />}
+            title={q ? `No results for "${q}"` : "No series match your filters"}
+            description="Try a different genre, status, or search term."
+            action={
+              <Button
+                variant="outline"
+                className="rounded-full"
+                onClick={() => { setType("all"); setStatus("all"); setGenre("All"); setSort("latest"); setPage(0); }}
+              >
+                Reset filters
+              </Button>
+            }
+          />
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-3 gap-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
             {items.map(s => <SeriesCard key={s.id} series={s} />)}
           </div>
         )}

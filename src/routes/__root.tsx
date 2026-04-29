@@ -4,6 +4,7 @@ import { AuthProvider } from "@/lib/auth";
 import { ThemeProvider } from "@/lib/theme";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { MobileNav } from "@/components/mobile-nav";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -56,8 +57,9 @@ function RootComponent() {
     <ThemeProvider>
       <AuthProvider>
         <SiteHeader />
-        <main className="pt-0"><Outlet /></main>
+        <main className="pt-0 pb-16 md:pb-0"><Outlet /></main>
         <SiteFooter />
+        <MobileNav />
         <Toaster richColors position="top-center" />
       </AuthProvider>
     </ThemeProvider>
