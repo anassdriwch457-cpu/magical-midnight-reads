@@ -849,7 +849,7 @@ function UserModal({ user, canEditRoles, onClose, onChanged }: {
     if (Number.isNaN(d) || d === 0) return toast.error("Enter a non-zero amount");
     setBusy(true);
     const { data, error } = await supabase.rpc("adjust_user_coins", {
-      _target: user.id, _delta: d, _reason: reason.trim() || null,
+      _target: user.id, _delta: d, _reason: reason.trim() || undefined,
     });
     setBusy(false);
     if (error) return toast.error(error.message);
