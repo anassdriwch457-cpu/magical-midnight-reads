@@ -113,6 +113,33 @@ export type Database = {
           },
         ]
       }
+      coin_adjustments: {
+        Row: {
+          actor_user_id: string
+          created_at: string
+          delta: number
+          id: string
+          reason: string | null
+          target_user_id: string
+        }
+        Insert: {
+          actor_user_id: string
+          created_at?: string
+          delta: number
+          id?: string
+          reason?: string | null
+          target_user_id: string
+        }
+        Update: {
+          actor_user_id?: string
+          created_at?: string
+          delta?: number
+          id?: string
+          reason?: string | null
+          target_user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -229,6 +256,47 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      adjust_user_coins: {
+        Args: { _delta: number; _reason?: string; _target: string }
+        Returns: Json
+      }
+      admin_list_users: {
+        Args: never
+        Returns: {
+          coins: number
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          roles: string[]
+        }[]
+      }
+      admin_set_user_role: {
+        Args: {
+          _grant: boolean
+          _role: Database["public"]["Enums"]["app_role"]
+          _target: string
+        }
+        Returns: Json
+      }
+      admin_top_series: {
+        Args: { _limit?: number }
+        Returns: {
+          cover_url: string
+          revenue: number
+          series_id: string
+          title: string
+          unlocks: number
+        }[]
+      }
+      admin_total_sales: { Args: never; Returns: number }
+      admin_user_growth: {
+        Args: { _days?: number }
+        Returns: {
+          day: string
+          signups: number
+        }[]
+      }
       has_chapter_access: {
         Args: { _chapter_id: string; _user_id: string }
         Returns: boolean
@@ -243,7 +311,7 @@ export type Database = {
       unlock_chapter: { Args: { _chapter_id: string }; Returns: Json }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "super_admin" | "manager"
       series_status: "ongoing" | "completed" | "hiatus"
       series_type: "manga" | "novel"
     }
@@ -373,7 +441,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "super_admin", "manager"],
       series_status: ["ongoing", "completed", "hiatus"],
       series_type: ["manga", "novel"],
     },

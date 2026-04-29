@@ -4,11 +4,20 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface Wallet { coins: number }
 
+export type Role = "user" | "admin" | "super_admin" | "manager";
+
 interface AuthCtx {
   user: User | null;
   session: Session | null;
   wallet: Wallet | null;
-  isAdmin: boolean;
+  roles: Role[];
+  isAdmin: boolean;          // legacy: any staff role
+  isSuperAdmin: boolean;
+  isManager: boolean;
+  isUploader: boolean;       // 'admin' role only (content uploader)
+  canManageContent: boolean; // super_admin || admin
+  canManageUsers: boolean;   // super_admin || manager
+  canViewAnalytics: boolean; // super_admin || manager
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>;
@@ -22,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadUserData = async (uid: string) => {
@@ -31,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       supabase.from("user_roles").select("role").eq("user_id", uid),
     ]);
     setWallet(w ?? { coins: 0 });
-    setIsAdmin(!!r?.some((x) => x.role === "admin"));
+    setRoles((r ?? []).map((x) => x.role as Role));
   };
 
   useEffect(() => {
@@ -42,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTimeout(() => loadUserData(s.user.id), 0);
       } else {
         setWallet(null);
-        setIsAdmin(false);
+        setRoles([]);
       }
     });
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -68,8 +77,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => { await supabase.auth.signOut(); };
   const refreshWallet = async () => { if (user) await loadUserData(user.id); };
 
+  const isSuperAdmin = roles.includes("super_admin");
+  const isManager = roles.includes("manager");
+  const isUploader = roles.includes("admin");
+  const canManageContent = isSuperAdmin || isUploader;
+  const canManageUsers = isSuperAdmin || isManager;
+  const canViewAnalytics = isSuperAdmin || isManager;
+  const isAdmin = isSuperAdmin || isManager || isUploader;
+
   return (
-    <Ctx.Provider value={{ user, session, wallet, isAdmin, loading, signIn, signUp, signOut, refreshWallet }}>
+    <Ctx.Provider value={{
+      user, session, wallet, roles,
+      isAdmin, isSuperAdmin, isManager, isUploader,
+      canManageContent, canManageUsers, canViewAnalytics,
+      loading, signIn, signUp, signOut, refreshWallet,
+    }}>
       {children}
     </Ctx.Provider>
   );
