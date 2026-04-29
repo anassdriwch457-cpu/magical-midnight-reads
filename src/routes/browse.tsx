@@ -15,9 +15,9 @@ const SORTS = [{ k: "latest", l: "Latest" }, { k: "popular", l: "Popular" }, { k
 
 export const Route = createFileRoute("/browse")({
   component: BrowsePage,
-  validateSearch: (s: Record<string, unknown>) => ({
-    q: typeof s.q === "string" ? s.q : "",
-    type: typeof s.type === "string" ? s.type : "all",
+  validateSearch: (s: Record<string, unknown>): { q?: string; type?: string } => ({
+    q: typeof s.q === "string" && s.q ? s.q : undefined,
+    type: typeof s.type === "string" && s.type ? s.type : undefined,
   }),
   head: () => ({
     meta: [
