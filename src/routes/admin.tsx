@@ -47,8 +47,9 @@ function AdminPage() {
     if (canManageContent) t.push("content");
     if (canManageUsers) t.push("users");
     if (canViewAnalytics) t.push("finance");
+    if (isSuperAdmin || isManager) t.push("settings");
     return t;
-  }, [canViewAnalytics, canManageContent, canManageUsers]);
+  }, [canViewAnalytics, canManageContent, canManageUsers, isSuperAdmin, isManager]);
 
   const [tab, setTab] = useState<Tab | null>(null);
 
