@@ -16,7 +16,7 @@ import {
   Shield, Plus, Pencil, Trash2, Upload, ArrowLeft, BookOpen, Image as ImageIcon,
   BarChart3, Library, Users as UsersIcon, Coins, TrendingUp, Crown, Ban, CheckCircle2,
   Receipt, ArrowDownRight, ArrowUpRight, Settings as SettingsIcon, LayoutGrid, Rows3,
-  Sparkles, Flame, Save,
+  Sparkles, Flame, Save, CreditCard, ExternalLink, KeyRound,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -29,7 +29,7 @@ type Chapter = Tables<"chapters">;
 
 const ALL_GENRES = ["Action","Adventure","Comedy","Drama","Fantasy","Josei","Magic","Mystery","Romance","School Life","Shoujo","Shounen Ai","Supernatural","Yaoi","Yuri"];
 
-type Tab = "analytics" | "content" | "users" | "finance" | "settings";
+type Tab = "analytics" | "content" | "users" | "finance" | "payments" | "settings";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -47,6 +47,7 @@ function AdminPage() {
     if (canManageContent) t.push("content");
     if (canManageUsers) t.push("users");
     if (canViewAnalytics) t.push("finance");
+    if (isSuperAdmin || isManager) t.push("payments");
     if (isSuperAdmin || isManager) t.push("settings");
     return t;
   }, [canViewAnalytics, canManageContent, canManageUsers, isSuperAdmin, isManager]);
@@ -101,6 +102,7 @@ ON CONFLICT DO NOTHING;`}</code></pre>
           {tab === "content" && <ContentView />}
           {tab === "users" && <UsersView canEditRoles={isSuperAdmin} />}
           {tab === "finance" && <FinanceView />}
+          {tab === "payments" && <PaymentsView />}
           {tab === "settings" && <SettingsView />}
         </div>
       </div>
@@ -120,6 +122,7 @@ function AdminSidebar({ tab, setTab, allowedTabs, roleLabel }: {
     { key: "content", label: "Library", icon: Library },
     { key: "users", label: "Users", icon: UsersIcon },
     { key: "finance", label: "Finance", icon: Receipt },
+    { key: "payments", label: "Payments", icon: CreditCard },
     { key: "settings", label: "Settings", icon: SettingsIcon },
   ];
   return (
