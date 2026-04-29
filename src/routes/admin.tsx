@@ -113,17 +113,18 @@ function AdminSidebar({ tab, setTab, allowedTabs, roleLabel }: {
   roleLabel: string;
 }) {
   const items: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
-    { key: "analytics", label: "Analytics", icon: BarChart3 },
-    { key: "content", label: "Content", icon: Library },
+    { key: "analytics", label: "Dashboard", icon: BarChart3 },
+    { key: "content", label: "Library", icon: Library },
     { key: "users", label: "Users", icon: UsersIcon },
+    { key: "finance", label: "Finance", icon: Receipt },
   ];
   return (
-    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-card/40 min-h-[calc(100vh-5rem)] p-4 gap-1">
-      <div className="px-3 py-4 mb-2 border-b border-border">
+    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border/40 bg-card/30 backdrop-blur-xl min-h-[calc(100vh-5rem)] p-4 gap-1 supports-[backdrop-filter]:bg-card/20">
+      <div className="px-3 py-4 mb-2 border-b border-border/40">
         <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
           <Crown className="h-3.5 w-3.5 text-primary" /> {roleLabel}
         </div>
-        <div className="mt-1 text-lg font-extrabold tracking-tight">Dashboard</div>
+        <div className="mt-1 text-lg font-extrabold tracking-tight bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">Control Center</div>
       </div>
       {items.filter(i => allowedTabs.includes(i.key)).map(({ key, label, icon: Icon }) => {
         const active = tab === key;
@@ -131,9 +132,9 @@ function AdminSidebar({ tab, setTab, allowedTabs, roleLabel }: {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-semibold transition-colors text-left ${
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-semibold transition-all text-left ${
               active
-                ? "bg-primary text-primary-foreground"
+                ? "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg shadow-primary/20"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             }`}
           >
