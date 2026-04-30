@@ -1,11 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Coins, Lock, Maximize2, Minimize2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Coins, Lock, Maximize2, Minimize2, ListOrdered } from "lucide-react";
 import { toast } from "sonner";
+import { QuickSwitchDrawer } from "@/components/quick-switch-drawer";
+import { SparkleBurst } from "@/components/sparkle-burst";
 
 type Chapter = Tables<"chapters">;
 type Page = Tables<"chapter_pages">;
@@ -23,7 +25,8 @@ function ReaderPage() {
   const [series, setSeries] = useState<Series | null>(null);
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const [pages, setPages] = useState<Page[]>([]);
-  const [allChapters, setAllChapters] = useState<number[]>([]);
+  const [allChapters, setAllChapters] = useState<Chapter[]>([]);
+  const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
   const [siblings, setSiblings] = useState<{ prev?: number; next?: number }>({});
   const [unlocked, setUnlocked] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -34,8 +37,12 @@ function ReaderPage() {
   const [showUI, setShowUI] = useState(true);
   const [cinematic, setCinematic] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sparkle, setSparkle] = useState(false);
+  const [ambient, setAmbient] = useState<string>("oklch(0.62 0.20 305)");
   const scrollerRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sampledRef = useRef<Set<string>>(new Set());
 
   const load = async () => {
     setLoading(true);
@@ -46,42 +53,29 @@ function ReaderPage() {
 
     try {
       const { data: s, error: seriesError } = await supabase
-        .from("series")
-        .select("*")
-        .eq("slug", slug)
-        .maybeSingle();
-
+        .from("series").select("*").eq("slug", slug).maybeSingle();
       if (seriesError) throw seriesError;
       if (!s) {
-        setSeries(null);
-        setChapter(null);
+        setSeries(null); setChapter(null);
         setDebugMessage(`Debug: Series slug "${slug}" was reached, but no series was found.`);
         return;
       }
-
       setSeries(s);
 
       const { data: chapterRows, error: chaptersError } = await supabase
-        .from("chapters")
-        .select("*")
-        .eq("series_id", s.id)
-        .order("number", { ascending: true });
-
+        .from("chapters").select("*").eq("series_id", s.id).order("number", { ascending: true });
       if (chaptersError) throw chaptersError;
 
       const allRows = chapterRows ?? [];
-      const nums = allRows.map((item) => Number(item.number));
-      setAllChapters(nums);
+      setAllChapters(allRows);
 
+      const nums = allRows.map((item) => Number(item.number));
       const currentChapter = allRows.find((item) => Number(item.number) === Number(number)) ?? null;
       if (!currentChapter) {
-        setChapter(null);
-        setSiblings({});
-        setUnlocked(false);
+        setChapter(null); setSiblings({}); setUnlocked(false);
         setDebugMessage(`Debug: Series "${s.title}" loaded, but chapter number ${number} was not found.`);
         return;
       }
-
       setChapter(currentChapter);
 
       const idx = nums.indexOf(Number(currentChapter.number));
@@ -91,35 +85,23 @@ function ReaderPage() {
       });
 
       let access = currentChapter.price === 0;
-      if (!access && user) {
-        const { data: unlockedRow, error: unlockError } = await supabase
-          .from("chapter_unlocks")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("chapter_id", currentChapter.id)
-          .maybeSingle();
-
-        if (unlockError) throw unlockError;
-        access = !!unlockedRow;
+      if (user) {
+        const { data: u } = await supabase.from("chapter_unlocks").select("chapter_id").eq("user_id", user.id);
+        const unlockedSet = new Set((u ?? []).map((x) => x.chapter_id));
+        setUnlockedIds(unlockedSet);
+        if (!access) access = unlockedSet.has(currentChapter.id);
       }
-
       setUnlocked(access);
 
       if (s.type === "manga" && access) {
         setLoading(false);
         setPagesLoading(true);
         const { data: pageRows, error: pagesError } = await supabase
-          .from("chapter_pages")
-          .select("*")
-          .eq("chapter_id", currentChapter.id)
-          .order("page_number", { ascending: true });
-
+          .from("chapter_pages").select("*").eq("chapter_id", currentChapter.id).order("page_number", { ascending: true });
         if (pagesError) throw pagesError;
-
         const loadedPages = pageRows ?? [];
         setPages(loadedPages);
         setPagesLoading(false);
-
         if (loadedPages.length === 0) {
           setDebugMessage(`Debug: Chapter ID ${currentChapter.id} reached. No images found in Supabase.`);
         }
@@ -137,12 +119,13 @@ function ReaderPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [slug, number, user?.id]);
 
+  // Auto-hide UI
   useEffect(() => {
     if (!unlocked) return;
     const reveal = () => {
       setShowUI(true);
       if (hideTimer.current) clearTimeout(hideTimer.current);
-      hideTimer.current = setTimeout(() => setShowUI(false), 2500);
+      hideTimer.current = setTimeout(() => setShowUI(false), 2800);
     };
     reveal();
     const scroller = scrollerRef.current;
@@ -157,7 +140,7 @@ function ReaderPage() {
     };
   }, [unlocked]);
 
-  // Track scroll progress through the chapter
+  // Scroll progress
   useEffect(() => {
     if (!unlocked) return;
     const el = scrollerRef.current;
@@ -175,7 +158,34 @@ function ReaderPage() {
     return () => { cancelAnimationFrame(raf); el.removeEventListener("scroll", onScroll); };
   }, [unlocked, pages.length]);
 
-  // Auto-enter cinematic on touch devices? keep manual.
+  // Ambient light: sample dominant color from page imgs as they enter the viewport
+  const samplePage = (img: HTMLImageElement, key: string) => {
+    if (sampledRef.current.has(key)) return;
+    sampledRef.current.add(key);
+    try {
+      const canvas = document.createElement("canvas");
+      const w = (canvas.width = 24);
+      const h = (canvas.height = 36);
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0, w, h);
+      const data = ctx.getImageData(0, 0, w, h).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const a = data[i + 3];
+        if (a < 128) continue;
+        // Skip near-black/white to capture meaningful color
+        const br = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        if (br < 30 || br > 240) continue;
+        r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
+      }
+      if (n < 20) return;
+      r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
+      setAmbient(`rgb(${r}, ${g}, ${b})`);
+    } catch {
+      // Cross-origin canvas tainting — skip silently
+    }
+  };
 
   const handleUnlock = async () => {
     if (!user) { navigate({ to: "/auth" }); return; }
@@ -190,6 +200,7 @@ function ReaderPage() {
       else toast.error(r.error ?? "Failed to unlock");
       return;
     }
+    setSparkle(true);
     toast.success(`Chapter ${Number(chapter.number)} unlocked!`, {
       description: `−${chapter.price} coins · Balance: ${r.balance ?? "—"} coins remaining`,
       icon: "🔓",
@@ -201,27 +212,40 @@ function ReaderPage() {
 
   const uiVisible = showUI && !cinematic;
 
+  const drawerChapters = useMemo(
+    () => allChapters.map((c) => ({ id: c.id, number: c.number, title: c.title, price: c.price })),
+    [allChapters]
+  );
+
   const renderTopBar = () => (
-    <div
-      className={`fixed top-0 inset-x-0 z-40 transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-    >
-      <div className="bg-gradient-to-b from-black/90 to-transparent backdrop-blur-md">
+    <div className={`fixed top-0 inset-x-0 z-40 transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+      <div className="glass-strong">
         <div className="container mx-auto px-4 h-14 flex items-center justify-between gap-3">
-          <Link to="/series/$slug" params={{ slug }} className="flex items-center gap-2 text-sm text-white/90 hover:text-primary min-w-0">
+          <Link to="/series/$slug" params={{ slug }} className="haptic flex items-center gap-2 text-sm text-white/90 hover:text-primary min-w-0">
             <ArrowLeft className="h-4 w-4 shrink-0" />
             <span className="font-bold truncate max-w-[40vw]">{series?.title ?? "Back to Series"}</span>
           </Link>
           <div className="text-xs uppercase tracking-wider text-white/70 font-bold truncate hidden sm:block">
             {chapter ? `CH ${Number(chapter.number)}${chapter.title ? ` · ${chapter.title}` : ""}` : `CH ${number}`}
           </div>
-          <button
-            onClick={() => setCinematic(c => !c)}
-            aria-label={cinematic ? "Exit cinematic mode" : "Enter cinematic mode"}
-            className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white transition-colors"
-          >
-            {cinematic ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-            <span className="hidden sm:inline">{cinematic ? "Exit" : "Cinema"}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Quick switch chapters"
+              className="haptic shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white"
+            >
+              <ListOrdered className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Chapters</span>
+            </button>
+            <button
+              onClick={() => setCinematic((c) => !c)}
+              aria-label={cinematic ? "Exit cinematic mode" : "Enter cinematic mode"}
+              className="haptic shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white"
+            >
+              {cinematic ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">{cinematic ? "Exit" : "Cinema"}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -230,8 +254,8 @@ function ReaderPage() {
   const renderProgressBar = () => (
     <div className="fixed top-0 inset-x-0 z-50 h-0.5 bg-white/5 pointer-events-none">
       <div
-        className="h-full bg-gradient-to-r from-primary to-primary/70 transition-[width] duration-150 ease-out shadow-[0_0_8px_var(--neon-purple)]"
-        style={{ width: `${progress}%` }}
+        className="h-full transition-[width] duration-150 ease-out"
+        style={{ width: `${progress}%`, background: "var(--gradient-aurora)", boxShadow: "0 0 12px var(--neon-purple)" }}
       />
     </div>
   );
@@ -241,7 +265,7 @@ function ReaderPage() {
       <button
         onClick={() => setCinematic(false)}
         aria-label="Exit cinematic mode"
-        className="fixed top-3 right-3 z-50 inline-flex items-center justify-center h-9 w-9 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur transition-colors"
+        className="haptic fixed top-3 right-3 z-50 inline-flex items-center justify-center h-9 w-9 rounded-full glass text-white"
       >
         <Minimize2 className="h-4 w-4" />
       </button>
@@ -249,35 +273,32 @@ function ReaderPage() {
   );
 
   const renderBottomBar = () => (
-    <div
-      className={`fixed bottom-0 inset-x-0 z-40 bg-gradient-to-t from-black/95 to-transparent backdrop-blur-md transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-    >
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-2">
+    <div className={`fixed bottom-0 inset-x-0 z-40 glass-strong transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div className="container mx-auto px-3 h-16 flex items-center justify-between gap-2">
         {siblings.prev !== undefined ? (
-          <Button asChild variant="ghost" className="text-white hover:bg-white/10 rounded-[4px]">
+          <Button asChild variant="ghost" className="haptic text-white hover:bg-white/10 rounded-full">
             <Link to="/series/$slug/chapter/$number" params={{ slug, number: String(siblings.prev) }}>
-              <ChevronLeft className="h-4 w-4" /> PREV
+              <ChevronLeft className="h-4 w-4" /> <span className="hidden sm:inline">PREV</span>
             </Link>
           </Button>
-        ) : <div />}
+        ) : <div className="w-16" />}
 
-        <select
-          value={chapter ? String(chapter.number) : String(number)}
-          onChange={(e) => navigate({ to: "/series/$slug/chapter/$number", params: { slug, number: e.target.value } })}
-          className="bg-white/10 hover:bg-white/15 text-white text-xs font-bold uppercase tracking-wider rounded-[4px] h-9 px-3 border border-white/15 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+        <button
+          onClick={() => setDrawerOpen(true)}
+          className="haptic inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/15 text-white text-xs font-bold uppercase tracking-wider rounded-full h-9 px-4 ring-1 ring-white/15"
         >
-          {allChapters.map((n) => (
-            <option key={n} value={String(n)} className="bg-black text-white">CH {n}</option>
-          ))}
-        </select>
+          <ListOrdered className="h-3.5 w-3.5" />
+          CH {chapter ? Number(chapter.number) : number}
+        </button>
 
         {siblings.next !== undefined ? (
-          <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-[4px]">
+          <Button asChild className="haptic bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full px-5 shadow-glow">
             <Link to="/series/$slug/chapter/$number" params={{ slug, number: String(siblings.next) }}>
-              NEXT <ChevronRight className="h-4 w-4" />
+              <span className="hidden sm:inline">NEXT</span> <ChevronRight className="h-4 w-4" />
             </Link>
           </Button>
-        ) : <div />}
+        ) : <div className="w-16" />}
       </div>
     </div>
   );
@@ -301,7 +322,7 @@ function ReaderPage() {
       <div className="fixed inset-0 bg-black overflow-y-auto z-30">
         {renderTopBar()}
         <div className="min-h-screen flex items-center justify-center p-4 pt-20 pb-24">
-          <div className="max-w-xl w-full rounded-[6px] border border-border bg-card p-5 text-left shadow-card">
+          <div className="max-w-xl w-full rounded-2xl glass-card p-5 text-left shadow-card">
             <div className="flex items-start gap-3 text-primary">
               <AlertCircle className="h-5 w-5 mt-0.5" />
               <div className="space-y-2">
@@ -321,31 +342,58 @@ function ReaderPage() {
       <div className="fixed inset-0 bg-black overflow-y-auto z-30">
         {renderTopBar()}
         <div className="min-h-screen flex items-center justify-center px-4 pt-20 pb-24">
-          <div className="w-full max-w-md rounded-[4px] border border-border bg-card p-10 shadow-card text-center">
-            <Lock className="mx-auto h-12 w-12 text-primary mb-3" />
-            <h1 className="text-2xl font-bold">Chapter {Number(chapter.number)} is locked</h1>
+          {/* Aurora ambient backdrop */}
+          <div className="pointer-events-none absolute inset-0 opacity-30 mix-blend-screen blur-3xl"
+               style={{ background: "var(--gradient-aurora)" }} aria-hidden />
+          <div className="relative w-full max-w-md rounded-2xl glass-card p-10 shadow-elev text-center animate-scale-in">
+            <div className="relative inline-grid place-items-center mb-3">
+              <span className="absolute h-16 w-16 rounded-full animate-pulse-ring" aria-hidden />
+              <div className="relative grid h-14 w-14 place-items-center rounded-full bg-aurora text-white shadow-glow">
+                <Lock className="h-6 w-6" />
+              </div>
+            </div>
+            <h1 className="text-2xl font-extrabold">Chapter {Number(chapter.number)} is locked</h1>
             <p className="text-muted-foreground mt-1">{series.title}</p>
-            <div className="my-6 inline-flex items-center gap-2 text-2xl font-bold">
-              <Coins className="h-6 w-6 text-[var(--coin)]" /> {chapter.price}
+            <div className="my-6 inline-flex items-center gap-2 text-2xl font-extrabold">
+              <Coins className="h-6 w-6 text-[var(--coin)]" /> <span className="shimmer-text">{chapter.price}</span>
             </div>
             {user && <p className="text-sm text-muted-foreground mb-4">Your balance: <span className="font-semibold text-foreground tabular-nums">{wallet?.coins ?? 0}</span></p>}
-            <Button onClick={handleUnlock} disabled={unlocking} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-[4px] h-11">
+            <Button onClick={handleUnlock} disabled={unlocking} className="haptic w-full bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-11 shadow-glow">
               {unlocking ? "UNLOCKING…" : user ? "UNLOCK CHAPTER" : "SIGN IN TO UNLOCK"}
             </Button>
-            <Button asChild variant="ghost" className="w-full mt-2"><Link to="/topup">Need more coins? Top up →</Link></Button>
+            <Button asChild variant="ghost" className="w-full mt-2 text-white/80 hover:text-white"><Link to="/topup">Need more coins? Top up →</Link></Button>
           </div>
         </div>
         {renderBottomBar()}
+        <QuickSwitchDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          seriesSlug={slug}
+          seriesTitle={series.title}
+          chapters={drawerChapters}
+          unlockedIds={unlockedIds}
+          currentNumber={chapter.number}
+        />
       </div>
     );
   }
 
   return (
     <div ref={scrollerRef} className="fixed inset-0 bg-black overflow-y-auto z-30 [scroll-behavior:smooth]">
+      {/* Ambient light backdrop reflecting current page color */}
+      <div
+        className="pointer-events-none fixed inset-0 -z-0 opacity-50 transition-[background] duration-700 ease-out"
+        aria-hidden
+        style={{
+          background: `radial-gradient(60% 50% at 50% 30%, ${ambient} 0%, transparent 65%), radial-gradient(70% 60% at 50% 90%, ${ambient} 0%, transparent 70%)`,
+          filter: "blur(60px) saturate(120%)",
+        }}
+      />
+
       {renderProgressBar()}
       {renderTopBar()}
       {renderCinemaExit()}
-      <div className={`${series.type === "manga" ? "max-w-3xl mx-auto" : "max-w-2xl mx-auto px-4"} ${cinematic ? "pt-2 pb-2" : "pt-20 pb-24"}`}>
+      <div className={`relative z-10 ${series.type === "manga" ? "max-w-3xl mx-auto" : "max-w-2xl mx-auto px-4"} ${cinematic ? "pt-2 pb-2" : "pt-20 pb-24"}`}>
         {series.type === "manga" ? (
           pagesLoading ? (
             <div className="flex items-center justify-center py-20">
@@ -356,7 +404,7 @@ function ReaderPage() {
             </div>
           ) : pages.length === 0 ? (
             <div className="px-4 py-20">
-              <div className="mx-auto max-w-xl rounded-[6px] border border-border bg-card p-5 text-left shadow-card">
+              <div className="mx-auto max-w-xl rounded-2xl glass-card p-5 text-left shadow-card">
                 <div className="flex items-start gap-3 text-primary">
                   <AlertCircle className="h-5 w-5 mt-0.5" />
                   <div className="space-y-2">
@@ -377,7 +425,9 @@ function ReaderPage() {
                 decoding="async"
                 fetchPriority={i < 2 ? "high" : "low"}
                 draggable={false}
-                className="w-full block select-none [content-visibility:auto] [contain-intrinsic-size:1200px]"
+                crossOrigin="anonymous"
+                onLoad={(e) => { if (i < 4) samplePage(e.currentTarget, p.id); }}
+                className="w-full block select-none [content-visibility:auto] [contain-intrinsic-size:1200px] shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
               />
             ))
           )
@@ -386,8 +436,32 @@ function ReaderPage() {
             {chapter.content || "No content."}
           </article>
         )}
+
+        {/* End-of-chapter CTA */}
+        {unlocked && pages.length > 0 && siblings.next !== undefined && (
+          <div className="mt-10 mb-4 flex justify-center">
+            <Button asChild size="lg" className="haptic bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-12 px-8 shadow-glow">
+              <Link to="/series/$slug/chapter/$number" params={{ slug, number: String(siblings.next) }}>
+                NEXT CHAPTER <ChevronRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        )}
       </div>
+
       {renderBottomBar()}
+
+      <QuickSwitchDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        seriesSlug={slug}
+        seriesTitle={series.title}
+        chapters={drawerChapters}
+        unlockedIds={unlockedIds}
+        currentNumber={chapter.number}
+      />
+
+      {sparkle && <SparkleBurst onDone={() => setSparkle(false)} />}
     </div>
   );
 }
