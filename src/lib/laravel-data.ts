@@ -19,8 +19,28 @@
  *   GET  /user                         -> User
  */
 import { api, ApiError } from "@/lib/api";
+import { mockSeries, mockChapters, mockSiteSettings } from "@/lib/mock-data";
 
 type Row = Record<string, unknown>;
+
+/** Return mock rows for a table — used as graceful fallback when API is down. */
+function mockFallback(table: string): Row[] {
+  switch (table) {
+    case "series": return mockSeries as unknown as Row[];
+    case "chapters": return mockChapters as unknown as Row[];
+    case "site_settings": return [mockSiteSettings] as unknown as Row[];
+    default: return [];
+  }
+}
+
+/** True if the error means the backend is unreachable / down (not a real app error). */
+function isBackendDown(e: unknown): boolean {
+  if (e instanceof ApiError) {
+    // 0 = network error, 5xx = server down, 404 = endpoint missing on backend
+    return e.status === 0 || e.status >= 500 || e.status === 404;
+  }
+  return true;
+}
 
 interface QueryState {
   table: string;
