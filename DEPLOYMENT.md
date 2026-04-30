@@ -1,45 +1,61 @@
 # Deployment Guide — Project Nuvia / Paradise
 
-This project is a TanStack Start v1 app (React 19 + Vite 7) with a Supabase-compatible backend. It deploys cleanly to any VPS, Cloudflare Workers, Node host, or any other provider that supports Node-compatible runtimes.
+This is a **TanStack Start v1** app (React 19 + Vite 7) with full SSR and server functions. It is **not** a static SPA — there is no plain `dist/` folder you can serve from a static host. The build produces a server bundle plus client assets.
 
-## 1. Environment Variables
+## 1. Supported Deploy Targets
 
-All secrets are loaded from `import.meta.env` (browser/build-time) or `process.env` (server). **Nothing is hardcoded.**
+| Target | Status | Notes |
+|---|---|---|
+| **Cloudflare Workers** | ✅ Default | Wired via `wrangler.jsonc` + `@cloudflare/vite-plugin`. Run `bun run build` then `wrangler deploy`. |
+| **Vercel** | ✅ Supported | Use TanStack Start's Vercel preset. See section 6. |
+| **Any Node host (VPS, Fly, Render)** | ✅ Supported | Build with the Node preset and run the server entry. |
+| **Static-only (Netlify/GitHub Pages serving `dist/`)** | ❌ Not supported | SSR + server functions + Stripe webhooks require a server runtime. |
 
-Create a `.env` (or set them in your host's dashboard):
+## 2. Environment Variables — naming rules
 
-```bash
-# Public (safe to ship to browser)
+**This split is a security boundary. Do NOT rename server secrets to `VITE_*` — Vite would inline them into the browser bundle and leak them to every visitor.**
+
+### Public — `VITE_` prefix (safe to ship to browser)
+```
 VITE_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOi...   # anon / publishable key
+VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOi...     # anon / publishable key
 VITE_SUPABASE_PROJECT_ID=your-project-ref
+```
 
-# Server-only (NEVER expose to browser)
+### Server-only — NO prefix (never sent to browser)
+```
 SUPABASE_URL=https://YOUR-PROJECT.supabase.co
 SUPABASE_PUBLISHABLE_KEY=eyJhbGciOi...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...        # admin operations
-STRIPE_SECRET_KEY=sk_live_...                   # Stripe payments
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...          # bypasses RLS
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...                  # required for live webhook
 ```
 
-## 2. Database Setup
+All code already follows this convention — `import.meta.env.VITE_*` for client, `process.env.*` inside `createServerFn` and server routes.
 
-The full production schema (tables, enums, RLS policies, functions, triggers, storage buckets) is exported to:
+## 3. Build Scripts
 
+```jsonc
+// package.json
+"scripts": {
+  "dev": "vite dev",
+  "build": "vite build",       // produces both server bundle and client assets
+  "build:dev": "vite build --mode development",
+  "preview": "vite preview"
+}
 ```
-supabase/schema/full_schema.sql
-```
 
-To replicate on a fresh Supabase project:
+There is no separate `dist/` output to upload — the deploy preset (Cloudflare/Vercel/Node) decides the output layout.
+
+## 4. Database Setup
+
+Full schema lives in `supabase/schema/full_schema.sql`. Apply it once on a fresh project:
 
 ```bash
 psql "$SUPABASE_DB_URL" -f supabase/schema/full_schema.sql
 ```
 
-Or via the Supabase SQL editor: paste the file contents and run.
-
-### Bootstrap the first super-admin
-
-After signing up your admin user, run **once** (replace with the actual UUID from `auth.users`):
+Bootstrap the first super-admin (after signing up):
 
 ```sql
 INSERT INTO public.user_roles (user_id, role)
@@ -47,28 +63,49 @@ VALUES ('<YOUR-AUTH-USER-UUID>', 'super_admin')
 ON CONFLICT DO NOTHING;
 ```
 
-The Admin page (`/admin`) will display this exact snippet pre-filled with your live `auth.uid()` if you visit it without a role — no hardcoded IDs anywhere in the codebase.
+Create a public storage bucket named `chapter-images`.
 
-### Storage bucket
+## 5. Stripe — Live Webhook
 
-Create a public bucket named `chapter-images` (Storage → New bucket → public).
+The production webhook route lives at:
 
-## 3. Build & Run
-
-```bash
-bun install
-bun run build
-bun run preview        # local production preview
+```
+src/routes/api/public/stripe-webhook.ts   →   POST /api/public/stripe-webhook
 ```
 
-Deploy the build output to any Node host or Cloudflare Workers (see `wrangler.jsonc`).
+It verifies signatures with `stripe.webhooks.constructEventAsync` (Web-Crypto-based, works on Workers / Edge / Node), then credits coins idempotently into `wallets` via `coin_purchase_sessions`.
 
-## 4. Caching & Performance
+### Configure the webhook in Stripe (Live mode)
 
-- **TanStack Query** (`@tanstack/react-query`) is wired through the router context — every page fetches via server functions and cached client-side.
-- **Reader image optimization** uses native `loading="lazy"`, `decoding="async"`, `fetchPriority` priority hints, and CSS `content-visibility: auto` so off-screen pages don't paint.
-- Updating a series in the database is reflected on the frontend on next route load (or call `router.invalidate()` for an immediate refresh) — no rebuild required.
+1. Stripe Dashboard → **Developers → Webhooks → Add endpoint**.
+2. Endpoint URL: `https://<your-production-domain>/api/public/stripe-webhook`
+3. Listen to events:
+   - `checkout.session.completed`
+   - `checkout.session.async_payment_succeeded`
+   - `checkout.session.async_payment_failed`
+4. Copy the **Signing secret** (`whsec_...`) and add it as `STRIPE_WEBHOOK_SECRET` in your host's env vars.
+5. Switch from Test → **Live** mode in the dashboard and repeat for the live endpoint.
 
-## 5. Stripe
+### Local testing
 
-Add `STRIPE_SECRET_KEY` to your env. Webhooks live under `src/routes/api/public/` and verify signatures.
+```bash
+stripe listen --forward-to localhost:8080/api/public/stripe-webhook
+# Copy the printed whsec_... into STRIPE_WEBHOOK_SECRET in .env
+stripe trigger checkout.session.completed
+```
+
+## 6. Vercel Deployment
+
+Vercel does not serve a static `dist/` — it runs the SSR server as a Node/Edge function via TanStack Start's Vercel preset.
+
+1. Remove `@cloudflare/vite-plugin` from your `vite.config.ts` flow (or use the Vercel preset alongside).
+2. In the Vercel dashboard → **Project → Settings → Environment Variables**, add **all** the env vars from section 2.
+3. Build command: `bun run build`
+4. Install command: `bun install`
+5. Output directory: leave **blank** — TanStack Start's adapter manages the output layout. Do not set it to `dist`.
+6. After first deploy, point the Stripe live webhook at `https://<project>.vercel.app/api/public/stripe-webhook`.
+
+## 7. Caching & Performance
+
+- `@tanstack/react-query` is wired through router context — DB updates show on next route load (or `router.invalidate()` for instant refresh). No rebuild needed.
+- Reader uses `loading="lazy"`, `decoding="async"`, `fetchPriority`, and CSS `content-visibility: auto`.
