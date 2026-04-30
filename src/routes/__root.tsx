@@ -19,7 +19,7 @@ function ApiErrorBridge() {
       if (now - last < 5000) return; // throttle
       last = now;
       toast.error("Service temporarily unavailable", {
-        description: err.message || "We couldn't reach the server. Showing cached content.",
+        description: "We couldn't reach the server. The app will keep rendering safely.",
       });
     });
   }, []);
