@@ -161,10 +161,25 @@ function unwrapList(res: unknown): { rows: Row[]; total: number } {
 export function makeLaravelQueryBuilder(table: string) {
   const state: QueryState = { table, filters: [] };
 
+  let warned = false;
   const exec = async () => {
     try {
-      return await fetchTable(state);
+      const r = await fetchTable(state);
+      // If backend returned empty for a table that has mock data, also fall back
+      // so the UI never renders blank when the API is misconfigured.
+      if (r.data.length === 0 && mockFallback(state.table).length > 0) {
+        return { data: mockFallback(state.table), count: mockFallback(state.table).length };
+      }
+      return r;
     } catch (e) {
+      if (isBackendDown(e)) {
+        if (!warned && typeof console !== "undefined") {
+          console.warn(`[DataClient] Laravel API unavailable for "${state.table}", using mock data.`, e);
+          warned = true;
+        }
+        const rows = mockFallback(state.table);
+        return { data: rows, count: rows.length };
+      }
       if (e instanceof ApiError) {
         return { data: [] as Row[], count: 0, error: { message: e.message } };
       }
