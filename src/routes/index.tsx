@@ -80,11 +80,11 @@ function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen pb-20 relative">
+    <div className="min-h-screen pb-24 relative">
       <Hero items={trending} loading={loading} />
       <GenreBar />
 
-      <div className="container mx-auto px-4 space-y-16 mt-12 relative z-10">
+      <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10 space-y-24 md:space-y-28 mt-16 md:mt-20 relative z-10">
         {loading ? (
           <section>
             <SectionHeader title="Loading" icon={<Sparkles className="h-4 w-4" />} />
@@ -119,20 +119,20 @@ function SectionHeader({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-80px" }}
       transition={{ duration: 0.5, ease: [0.22, 0.61, 0.36, 1] }}
-      className="flex items-end justify-between mb-6"
+      className="flex items-end justify-between mb-8 md:mb-10"
     >
-      <div className="flex items-center gap-3.5">
-        <span className="block h-7 w-1 rounded-full bg-aurora animate-glow-pulse" />
+      <div className="flex items-center gap-4">
+        <span className="block h-8 w-[3px] rounded-full bg-aurora animate-glow-pulse" />
         <div>
-          {eyebrow && <div className="eyebrow mb-0.5">{eyebrow}</div>}
-          <h2 className="text-xl md:text-2xl font-extrabold tracking-tight uppercase inline-flex items-center gap-2">
+          {eyebrow && <div className="eyebrow mb-1">{eyebrow}</div>}
+          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight inline-flex items-center gap-2.5 text-foreground">
             {icon && <span className="text-primary">{icon}</span>}
             {title}
           </h2>
         </div>
       </div>
       {href && (
-        <Link to={href} className="text-xs font-extrabold uppercase tracking-[0.2em] text-muted-foreground hover:text-primary story-link">
+        <Link to={href} className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground hover:text-primary story-link transition-colors duration-300">
           View All →
         </Link>
       )}
@@ -150,7 +150,7 @@ function LatestUpdatesSection({ items }: { items: LatestEntry[] }) {
         initial="initial"
         whileInView="enter"
         viewport={{ once: true, margin: "-60px" }}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-7"
       >
         {items.map((entry) => (
           <motion.div key={entry.series.id} variants={staggerItem}>
@@ -182,7 +182,7 @@ function Section({
         initial="initial"
         whileInView="enter"
         viewport={{ once: true, margin: "-80px" }}
-        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4"
+        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 md:gap-6"
       >
         {items.map((s) => (
           <motion.div key={s.id} variants={staggerItem}>
