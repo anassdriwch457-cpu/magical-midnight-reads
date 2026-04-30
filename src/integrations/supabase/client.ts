@@ -162,28 +162,34 @@ function createLaravelClient(): unknown {
       signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
         try {
           const r = await api.post<{ token: string; user: { id: number | string; email?: string; name?: string } }>(
-            '/login', { email, password }, { anonymous: true },
+            '/login', { email, password }, { anonymous: true, silent: true },
           );
           setAuthToken(r.token);
           cachedUser = { id: String(r.user.id), email: r.user.email, user_metadata: { display_name: r.user.name } };
           emitAuth('SIGNED_IN');
           return { data: { user: cachedUser, session: { user: cachedUser, access_token: r.token } }, error: null };
         } catch (e) {
-          return { data: { user: null, session: null }, error: { message: e instanceof ApiError ? e.message : 'Sign in failed' } };
+          const message = e instanceof ApiError
+            ? (e.status === 0 || e.status >= 500 ? 'Sign in is temporarily unavailable. Please try again shortly.' : e.message)
+            : 'Sign in failed';
+          return { data: { user: null, session: null }, error: { message } };
         }
       },
       signUp: async ({ email, password, options }: { email: string; password: string; options?: { data?: { display_name?: string } } }) => {
         try {
           const name = options?.data?.display_name ?? email.split('@')[0];
           const r = await api.post<{ token: string; user: { id: number | string; email?: string; name?: string } }>(
-            '/register', { name, email, password, password_confirmation: password }, { anonymous: true },
+            '/register', { name, email, password, password_confirmation: password }, { anonymous: true, silent: true },
           );
           setAuthToken(r.token);
           cachedUser = { id: String(r.user.id), email: r.user.email, user_metadata: { display_name: r.user.name } };
           emitAuth('SIGNED_IN');
           return { data: { user: cachedUser, session: { user: cachedUser, access_token: r.token } }, error: null };
         } catch (e) {
-          return { data: { user: null, session: null }, error: { message: e instanceof ApiError ? e.message : 'Sign up failed' } };
+          const message = e instanceof ApiError
+            ? (e.status === 0 || e.status >= 500 ? 'Sign up is temporarily unavailable. Please try again shortly.' : e.message)
+            : 'Sign up failed';
+          return { data: { user: null, session: null }, error: { message } };
         }
       },
       signOut: async () => {
