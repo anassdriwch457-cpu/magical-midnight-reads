@@ -90,7 +90,7 @@
   --accent-foreground: oklch(0.99 0 0);
   --destructive: oklch(0.62 0.22 25);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.30 0.025 285 / 0.55);
+  --border: oklch(1 0 0 / 0.08);
   --input: oklch(0.22 0.025 282);
   --ring: oklch(0.74 0.18 50);
   --neon-purple: oklch(0.62 0.20 305);
