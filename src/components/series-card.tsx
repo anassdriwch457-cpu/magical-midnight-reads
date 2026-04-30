@@ -15,23 +15,34 @@ export function SeriesCard({
     <Link
       to="/series/$slug"
       params={{ slug: series.slug }}
-      className="group block animate-fade-in"
+      className="group block"
     >
-      <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-muted shadow-card ring-1 ring-border/40 transition-all duration-300 group-hover:ring-primary/70 group-hover:shadow-glow group-hover:-translate-y-0.5">
+      <div
+        className="glow-halo relative aspect-[2/3] overflow-hidden rounded-xl bg-muted
+                   shadow-card ring-1 ring-border/50
+                   transition-all duration-500 ease-out
+                   group-hover:-translate-y-1 group-hover:shadow-elev group-hover:ring-primary/50"
+      >
         <img
           src={resolveImage(series.cover_url)}
           onError={onImageError}
           alt={series.title}
           loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
+          className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.08]"
         />
-        {/* gradient overlay */}
-        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 via-black/30 to-transparent opacity-90" />
-        {/* type badge */}
-        <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white backdrop-blur-md">
+        {/* Gradient veil */}
+        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
+        {/* Aurora hover glow */}
+        <div
+          className="absolute inset-0 opacity-0 group-hover:opacity-60 transition-opacity duration-500 mix-blend-overlay pointer-events-none"
+          style={{ background: "var(--gradient-aurora)" }}
+          aria-hidden
+        />
+        {/* Type chip */}
+        <span className="absolute left-2 top-2 rounded-md bg-black/55 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white backdrop-blur-md ring-1 ring-white/10">
           {typeLabel}
         </span>
-        {/* title over image */}
+        {/* Title */}
         <div className="absolute inset-x-0 bottom-0 p-2.5">
           <h3 className="line-clamp-2 text-[13px] font-extrabold leading-tight text-white drop-shadow-md group-hover:text-primary transition-colors">
             {series.title}
