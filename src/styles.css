@@ -2,10 +2,13 @@
 @source "../src";
 @import "tw-animate-css";
 
+/* Premium fonts: Inter (body), Cormorant Garamond (display wordmark), JetBrains Mono (numerics) */
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap");
+
 @custom-variant dark (&:is(.dark *));
 
 /*
- * NUVIA TOON DESIGN SYSTEM — "Deep Space Paradise"
+ * NUVIA TOON DESIGN SYSTEM — "Deep Space Paradise" v2 (Masterpiece)
  * Themes: Magic (default deep-space), Midnight, Concrete
  * All colors in oklch, semantic tokens only.
  */
