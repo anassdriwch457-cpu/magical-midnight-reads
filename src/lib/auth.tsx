@@ -1,9 +1,19 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { api, ApiError, clearAuthToken, getAuthToken, setAuthToken } from "@/lib/api";
 
 interface Wallet { coins: number }
+
+interface Session {
+  access_token: string | null;
+}
+
+interface User {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    display_name?: string;
+  };
+}
 
 export type Role = "user" | "admin" | "super_admin" | "manager";
 
@@ -35,76 +45,103 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadUserData = async (uid: string) => {
+  const syncSession = (token: string | null, nextUser: User | null) => {
+    setSession(token ? { access_token: token } : null);
+    setUser(nextUser);
+  };
+
+  const normalizeUser = (payload: { id: string | number; email?: string; name?: string }): User => ({
+    id: String(payload.id),
+    email: payload.email,
+    user_metadata: { display_name: payload.name },
+  });
+
+  const loadUserData = async () => {
     try {
-      const [{ data: w }, { data: r }] = await Promise.all([
-        supabase.from("wallets").select("coins").eq("user_id", uid).maybeSingle(),
-        supabase.from("user_roles").select("role").eq("user_id", uid),
+      const [{ coins }, rolesResponse] = await Promise.all([
+        api.get<{ coins: number }>("/wallet/balance", { silent: true }),
+        api.get<Array<{ role: Role }>>("/user/roles", { silent: true }).catch(() => []),
       ]);
-      setWallet(w ?? { coins: 0 });
-      setRoles((r ?? []).map((x) => x.role as Role));
+      setWallet({ coins: coins ?? 0 });
+      setRoles((rolesResponse ?? []).map((x) => x.role as Role));
     } catch (err) {
       console.error("Failed to load user data", err);
+      setWallet({ coins: 0 });
+      setRoles([]);
     }
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.user) {
-        setTimeout(() => loadUserData(s.user.id), 0);
-      } else {
+    const boot = async () => {
+      const token = getAuthToken();
+      if (!token) {
+        syncSession(null, null);
         setWallet(null);
         setRoles([]);
+        setLoading(false);
+        return;
       }
-    });
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.user) loadUserData(s.user.id);
-      setLoading(false);
-    });
-    return () => subscription.unsubscribe();
+
+      try {
+        const me = await api.get<{ id: string | number; email?: string; name?: string }>("/user", { silent: true });
+        const nextUser = normalizeUser(me);
+        syncSession(token, nextUser);
+        await loadUserData();
+      } catch {
+        clearAuthToken();
+        syncSession(null, null);
+        setWallet(null);
+        setRoles([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void boot();
   }, []);
 
-  // Live wallet updates: instantly reflect coin balance changes.
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel(`wallet-${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "wallets", filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          const next = (payload.new as { coins?: number } | null)?.coins;
-          if (typeof next === "number") {
-            setWallet((prev) => {
-              if (prev && next > prev.coins) {
-                toast.success(`+${next - prev.coins} coins`, { duration: 2200 });
-              }
-              return { coins: next };
-            });
-          }
-        }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user?.id]);
-
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+    try {
+      const result = await api.post<{ token: string; user: { id: string | number; email?: string; name?: string } }>(
+        "/login",
+        { email, password },
+        { anonymous: true }
+      );
+      setAuthToken(result.token);
+      syncSession(result.token, normalizeUser(result.user));
+      await loadUserData();
+      return { error: null };
+    } catch (error) {
+      return { error: error instanceof ApiError ? error.message : "Sign in failed" };
+    }
   };
   const signUp = async (email: string, password: string, displayName: string) => {
-    const { error } = await supabase.auth.signUp({
-      email, password,
-      options: { emailRedirectTo: window.location.origin, data: { display_name: displayName } },
-    });
-    return { error: error?.message ?? null };
+    try {
+      const result = await api.post<{ token: string; user: { id: string | number; email?: string; name?: string } }>(
+        "/register",
+        { name: displayName, email, password, password_confirmation: password },
+        { anonymous: true }
+      );
+      setAuthToken(result.token);
+      syncSession(result.token, normalizeUser(result.user));
+      await loadUserData();
+      return { error: null };
+    } catch (error) {
+      return { error: error instanceof ApiError ? error.message : "Sign up failed" };
+    }
   };
-  const signOut = async () => { await supabase.auth.signOut(); };
-  const refreshWallet = async () => { if (user) await loadUserData(user.id); };
+  const signOut = async () => {
+    try {
+      await api.post("/logout");
+    } catch {
+      // Ignore server logout errors; clear local session regardless.
+    }
+    clearAuthToken();
+    syncSession(null, null);
+    setWallet(null);
+    setRoles([]);
+  };
+  const refreshWallet = async () => { if (user) await loadUserData(); };
 
   const isSuperAdmin = roles.includes("super_admin");
   const isManager = roles.includes("manager");
