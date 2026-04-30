@@ -118,7 +118,7 @@ function emitAuth(event: string) {
 
 async function loadUserFromApi() {
   try {
-    const u = await api.get<{ id: number | string; email?: string; name?: string }>('/user');
+    const u = await api.get<{ id: number | string; email?: string; name?: string }>('/user', { silent: true });
     cachedUser = {
       id: String(u.id),
       email: u.email,
