@@ -19,22 +19,27 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const DIST = resolve(__dirname, "dist");
 const CLIENT_DIR = join(DIST, "client");
-const SERVER_ENTRY = pathToFileURL(join(DIST, "server", "index.js")).href;
-
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || "0.0.0.0";
 
-if (!existsSync(join(DIST, "server", "index.js"))) {
+// The server entry filename depends on the build target: standalone Node builds
+// emit dist/server/server.js; Cloudflare/other targets may emit dist/server/index.js.
+// Pick whichever exists.
+const SERVER_CANDIDATES = ["server.js", "index.js", "index.mjs"];
+const serverFile = SERVER_CANDIDATES
+  .map((f) => join(DIST, "server", f))
+  .find((p) => existsSync(p));
+if (!serverFile) {
   console.error(
-    "[server] dist/server/index.js not found. Run `STANDALONE=true bun run build` first."
+    "[server] no server entry found in dist/server/. Run `bun run build:standalone` first.",
   );
   process.exit(1);
 }
 
-const mod = await import(SERVER_ENTRY);
+const mod = await import(pathToFileURL(serverFile).href);
 const fetchHandler = mod.default;
 if (typeof fetchHandler !== "function") {
-  console.error("[server] dist/server/index.js has no default fetch handler export.");
+  console.error(`[server] ${serverFile} has no default fetch handler export.`);
   process.exit(1);
 }
 
