@@ -8,6 +8,7 @@ import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Coins, Lock, Maximiz
 import { toast } from "sonner";
 import { QuickSwitchDrawer } from "@/components/quick-switch-drawer";
 import { SparkleBurst } from "@/components/sparkle-burst";
+import { motion, SPRING, SpringNumber } from "@/lib/motion";
 
 type Chapter = Tables<"chapters">;
 type Page = Tables<"chapter_pages">;
@@ -343,26 +344,46 @@ function ReaderPage() {
         {renderTopBar()}
         <div className="min-h-screen flex items-center justify-center px-4 pt-20 pb-24">
           {/* Aurora ambient backdrop */}
-          <div className="pointer-events-none absolute inset-0 opacity-30 mix-blend-screen blur-3xl"
+          <div className="pointer-events-none absolute inset-0 opacity-30 mix-blend-screen blur-3xl animate-ambient"
                style={{ background: "var(--gradient-aurora)" }} aria-hidden />
-          <div className="relative w-full max-w-md rounded-2xl glass-card p-10 shadow-elev text-center animate-scale-in">
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.96, filter: "blur(8px)" }}
+            animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+            transition={SPRING.soft}
+            className="relative w-full max-w-md rounded-2xl glass-card p-10 shadow-elev text-center inner-highlight"
+          >
             <div className="relative inline-grid place-items-center mb-3">
               <span className="absolute h-16 w-16 rounded-full animate-pulse-ring" aria-hidden />
-              <div className="relative grid h-14 w-14 place-items-center rounded-full bg-aurora text-white shadow-glow">
+              <motion.div
+                initial={{ rotate: -10, scale: 0.8 }}
+                animate={{ rotate: 0, scale: 1 }}
+                transition={SPRING.snap}
+                className="relative grid h-14 w-14 place-items-center rounded-full bg-aurora text-white shadow-glow"
+              >
                 <Lock className="h-6 w-6" />
-              </div>
+              </motion.div>
             </div>
             <h1 className="text-2xl font-extrabold">Chapter {Number(chapter.number)} is locked</h1>
             <p className="text-muted-foreground mt-1">{series.title}</p>
             <div className="my-6 inline-flex items-center gap-2 text-2xl font-extrabold">
               <Coins className="h-6 w-6 text-[var(--coin)]" /> <span className="shimmer-text">{chapter.price}</span>
             </div>
-            {user && <p className="text-sm text-muted-foreground mb-4">Your balance: <span className="font-semibold text-foreground tabular-nums">{wallet?.coins ?? 0}</span></p>}
-            <Button onClick={handleUnlock} disabled={unlocking} className="haptic w-full bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-11 shadow-glow">
-              {unlocking ? "UNLOCKING…" : user ? "UNLOCK CHAPTER" : "SIGN IN TO UNLOCK"}
-            </Button>
+            {user && (
+              <p className="text-sm text-muted-foreground mb-4">
+                Your balance:{" "}
+                <SpringNumber
+                  value={wallet?.coins ?? 0}
+                  className="font-semibold text-foreground tabular-nums"
+                />
+              </p>
+            )}
+            <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={SPRING.snap}>
+              <Button onClick={handleUnlock} disabled={unlocking} className="focus-ring w-full bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-11 shadow-glow">
+                {unlocking ? "UNLOCKING…" : user ? "UNLOCK CHAPTER" : "SIGN IN TO UNLOCK"}
+              </Button>
+            </motion.div>
             <Button asChild variant="ghost" className="w-full mt-2 text-white/80 hover:text-white"><Link to="/topup">Need more coins? Top up →</Link></Button>
-          </div>
+          </motion.div>
         </div>
         {renderBottomBar()}
         <QuickSwitchDrawer
@@ -374,6 +395,7 @@ function ReaderPage() {
           unlockedIds={unlockedIds}
           currentNumber={chapter.number}
         />
+        {sparkle && <SparkleBurst onDone={() => setSparkle(false)} />}
       </div>
     );
   }
