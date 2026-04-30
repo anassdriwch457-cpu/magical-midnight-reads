@@ -2,10 +2,13 @@
 @source "../src";
 @import "tw-animate-css";
 
+/* Premium fonts: Inter (body), Cormorant Garamond (display wordmark), JetBrains Mono (numerics) */
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap");
+
 @custom-variant dark (&:is(.dark *));
 
 /*
- * NUVIA TOON DESIGN SYSTEM — "Deep Space Paradise"
+ * NUVIA TOON DESIGN SYSTEM — "Deep Space Paradise" v2 (Masterpiece)
  * Themes: Magic (default deep-space), Midnight, Concrete
  * All colors in oklch, semantic tokens only.
  */
@@ -195,19 +198,39 @@
 
 @layer base {
   * { border-color: var(--color-border); }
-  html { scroll-behavior: smooth; }
+  html {
+    scroll-behavior: smooth;
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-feature-settings: "ss01", "cv11";
+    font-feature-settings: "ss01", "cv11", "cv05";
     background-image: var(--gradient-mesh);
     background-attachment: fixed;
     background-size: 100% 100%;
+    /* subtle grain to kill banding on dark gradients */
+    position: relative;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.6;
+    mix-blend-mode: overlay;
   }
   ::selection {
     background: color-mix(in oklab, var(--primary) 60%, transparent);
     color: var(--primary-foreground);
   }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+  .font-mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
 }
 
 @layer utilities {
@@ -362,12 +385,49 @@
   .stagger > *:nth-child(11) { animation-delay: 440ms; }
   .stagger > *:nth-child(12) { animation-delay: 480ms; }
 
-  /* Brand wordmark — high-fashion */
+  /* Brand wordmark — high-fashion italic serif */
   .wordmark {
-    font-family: ui-serif, "Cormorant Garamond", "Playfair Display", Georgia, serif;
+    font-family: "Cormorant Garamond", ui-serif, Georgia, serif;
     font-style: italic;
     font-weight: 600;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.005em;
+  }
+  .wordmark-bold { font-weight: 700; }
+
+  /* Section eyebrow / kicker */
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: color-mix(in oklab, var(--foreground) 60%, transparent);
+  }
+
+  /* Animated gradient stroke (frame for hero, featured cards) */
+  .gradient-stroke {
+    position: relative;
+    isolation: isolate;
+  }
+  .gradient-stroke::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: var(--gradient-aurora);
+    background-size: 200% 200%;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    animation: gradient-pan 8s ease-in-out infinite;
+  }
+
+  /* Marquee label for trending */
+  .marquee-glow {
+    text-shadow:
+      0 0 8px color-mix(in oklab, var(--primary) 70%, transparent),
+      0 0 22px color-mix(in oklab, var(--primary) 35%, transparent);
   }
 
   /* Atmospheric depth utilities */
@@ -481,3 +541,21 @@
     animation: none !important;
   }
 }
+
+@keyframes gradient-pan {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+.animate-gradient { animation: gradient-pan 8s ease-in-out infinite; }
+
+@keyframes marquee-x {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee { animation: marquee-x 28s linear infinite; }
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 50%, transparent); }
+  50%      { box-shadow: 0 0 24px 6px color-mix(in oklab, var(--primary) 35%, transparent); }
+}
+.animate-glow-pulse { animation: glow-pulse 3.4s ease-in-out infinite; }

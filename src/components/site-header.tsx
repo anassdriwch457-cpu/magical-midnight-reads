@@ -1,14 +1,24 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
-import { Coins, Sparkles, Moon, Square, User, LogOut, Shield, Palette, Search, X } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import {
+  Coins, Sparkles, Moon, Square, User, LogOut, Shield, Palette, Search, X,
+} from "lucide-react";
 import { CoinBadge } from "@/components/coin-badge";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/nuvia-logo.png";
 import { resolveImage, onImageError } from "@/lib/image";
+import { motion, AnimatePresence, SPRING } from "@/lib/motion";
 
 type SearchHit = { id: string; title: string; slug: string; cover_url: string | null; type: string };
 
@@ -25,11 +35,13 @@ export function SiteHeader() {
   const { user, wallet, isAdmin, signOut } = useAuth();
   const { theme, setTheme, accent, setAccent } = useTheme();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -63,6 +75,20 @@ export function SiteHeader() {
     return () => window.removeEventListener("mousedown", onClick);
   }, []);
 
+  // Cmd/Ctrl-K to focus search
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+        const input = searchRef.current?.querySelector("input");
+        (input as HTMLInputElement | null)?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const submitSearch = (q: string) => {
     const trimmed = q.trim();
     if (!trimmed) return;
@@ -71,44 +97,92 @@ export function SiteHeader() {
   };
 
   return (
-    <header
-      className={`fixed top-0 z-40 w-full transition-all duration-300 ${
-      scrolled
-          ? "glass-strong shadow-[0_4px_20px_-12px_rgba(0,0,0,0.6)]"
+    <motion.header
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={SPRING.soft}
+      className={`fixed top-0 z-40 w-full transition-all duration-500 ${
+        scrolled
+          ? "glass-strong shadow-[0_8px_30px_-12px_rgba(0,0,0,0.7)]"
           : "bg-gradient-to-b from-black/65 via-black/25 to-transparent backdrop-blur-sm border-b border-transparent"
       }`}
     >
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link to="/" className="haptic flex items-center gap-2.5 group">
-          <img src={logo} alt="Nuvia Toon" width={32} height={32} className="brightness-0 invert transition-transform duration-500 group-hover:rotate-[8deg]" />
+      <div className={`container mx-auto flex items-center justify-between px-4 transition-all duration-500 ${scrolled ? "h-14" : "h-16"}`}>
+        {/* WORDMARK */}
+        <Link to="/" className="focus-ring rounded-md flex items-center gap-2.5 group shrink-0">
+          <motion.img
+            src={logo}
+            alt="Nuvia Toon"
+            width={32}
+            height={32}
+            className="brightness-0 invert"
+            whileHover={{ rotate: 8, scale: 1.06 }}
+            transition={SPRING.snap}
+          />
           <div className="leading-tight">
-            <div className="text-[19px] font-extrabold tracking-tight text-white">
+            <div className={`font-extrabold tracking-tight text-white transition-all duration-500 ${scrolled ? "text-[17px]" : "text-[19px]"}`}>
               <span className="wordmark text-aurora">Nuvia</span>
-              <span className="wordmark text-white/90"> Toon</span>
+              <span className="wordmark text-white/95"> Toon</span>
             </div>
-            <div className="text-[9px] uppercase tracking-[0.22em] text-white/55 font-medium">
-              Your Next <span className="wordmark not-italic font-semibold text-primary/90">Paradise</span> in Every Page
+            <div className="text-[9px] uppercase tracking-[0.24em] text-white/55 font-semibold">
+              Your Next <span className="wordmark not-italic font-semibold text-primary/95">Paradise</span> in Every Page
             </div>
           </div>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-7 text-[13px] font-extrabold tracking-wider">
-          {NAV.map((n) => (
-            <Link
-              key={n.label}
-              to={n.to}
-              className="text-white hover:text-primary transition-colors drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
-              activeProps={{ className: "text-primary" }}
-              activeOptions={{ exact: true }}
-            >
-              {n.label}
-            </Link>
-          ))}
+        {/* NAV with magnetic underline */}
+        <nav
+          className="hidden md:flex items-center gap-1 text-[12px] font-extrabold tracking-[0.18em] relative"
+          onMouseLeave={() => setHoveredNav(null)}
+        >
+          {NAV.map((n) => {
+            const key = `${n.to}-${n.label}`;
+            const active = pathname === n.to && !("search" in n);
+            const focused = hoveredNav === key || active;
+            return (
+              <Link
+                key={key}
+                to={n.to}
+                onMouseEnter={() => setHoveredNav(key)}
+                className={`focus-ring relative px-3.5 py-2 rounded-md transition-colors ${
+                  focused ? "text-white" : "text-white/70 hover:text-white"
+                }`}
+              >
+                <span className="relative z-10">{n.label}</span>
+                <AnimatePresence>
+                  {hoveredNav === key && (
+                    <motion.span
+                      layoutId="nav-pill"
+                      className="absolute inset-0 rounded-md bg-white/10 ring-1 ring-white/15"
+                      transition={SPRING.soft}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                    />
+                  )}
+                </AnimatePresence>
+                {active && (
+                  <motion.span
+                    layoutId="nav-active-bar"
+                    className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full bg-aurora"
+                    transition={SPRING.soft}
+                  />
+                )}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-2">
+          {/* SEARCH */}
           <div ref={searchRef} className="relative hidden md:block">
-            <div className="flex items-center bg-white/10 hover:bg-white/15 focus-within:bg-white/20 rounded-full transition-colors w-56 lg:w-72">
+            <motion.div
+              layout
+              transition={SPRING.snap}
+              className={`flex items-center bg-white/10 hover:bg-white/15 focus-within:bg-white/20 rounded-full transition-colors ${
+                searchOpen || query ? "w-72 lg:w-96" : "w-56 lg:w-64"
+              }`}
+            >
               <Search className="h-4 w-4 text-white/70 ml-3" />
               <input
                 value={query}
@@ -118,53 +192,68 @@ export function SiteHeader() {
                 placeholder="Search series…"
                 className="bg-transparent text-sm text-white placeholder:text-white/50 px-2 py-2 flex-1 outline-none"
               />
+              {!query && (
+                <kbd className="mr-2 hidden lg:inline-flex h-5 items-center rounded border border-white/15 bg-white/5 px-1.5 text-[10px] font-mono text-white/60">
+                  ⌘K
+                </kbd>
+              )}
               {query && (
                 <button onClick={() => { setQuery(""); setHits([]); }} className="mr-2 text-white/60 hover:text-white" aria-label="Clear">
                   <X className="h-4 w-4" />
                 </button>
               )}
-            </div>
-            {searchOpen && query.trim().length >= 2 && (
-              <div className="absolute top-full mt-2 left-0 right-0 rounded-lg border border-border bg-popover shadow-xl overflow-hidden z-50">
-                {searching && hits.length === 0 ? (
-                  <div className="px-3 py-4 text-sm text-muted-foreground">Searching…</div>
-                ) : hits.length === 0 ? (
-                  <div className="px-3 py-4 text-sm text-muted-foreground">No matches for "{query}"</div>
-                ) : (
-                  <>
-                    <ul className="max-h-80 overflow-auto">
-                      {hits.map((h) => (
-                        <li key={h.id}>
-                          <Link
-                            to="/series/$slug"
-                            params={{ slug: h.slug }}
-                            onClick={() => { setSearchOpen(false); setQuery(""); }}
-                            className="flex items-center gap-3 px-3 py-2 hover:bg-muted/60 transition-colors"
-                          >
-                            <img src={resolveImage(h.cover_url)} onError={onImageError} alt="" className="h-10 w-7 object-cover rounded bg-muted shrink-0" />
-                            <div className="min-w-0">
-                              <div className="text-sm font-semibold truncate">{h.title}</div>
-                              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{h.type}</div>
-                            </div>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                    <button
-                      onClick={() => submitSearch(query)}
-                      className="w-full text-left px-3 py-2 border-t border-border text-xs font-bold uppercase tracking-wider text-primary hover:bg-muted/60"
-                    >
-                      See all results for "{query}" →
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
+            </motion.div>
+
+            <AnimatePresence>
+              {searchOpen && query.trim().length >= 2 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                  transition={SPRING.snap}
+                  className="absolute top-full mt-2 left-0 right-0 rounded-2xl glass-card overflow-hidden z-50 shadow-elev"
+                >
+                  {searching && hits.length === 0 ? (
+                    <div className="px-4 py-5 text-sm text-muted-foreground">Searching…</div>
+                  ) : hits.length === 0 ? (
+                    <div className="px-4 py-5 text-sm text-muted-foreground">No matches for "{query}"</div>
+                  ) : (
+                    <>
+                      <ul className="max-h-80 overflow-auto">
+                        {hits.map((h) => (
+                          <li key={h.id}>
+                            <Link
+                              to="/series/$slug"
+                              params={{ slug: h.slug }}
+                              onClick={() => { setSearchOpen(false); setQuery(""); }}
+                              className="flex items-center gap-3 px-3 py-2 hover:bg-white/5 transition-colors"
+                            >
+                              <img src={resolveImage(h.cover_url)} onError={onImageError} alt="" className="h-12 w-9 object-cover rounded-md bg-muted shrink-0 ring-1 ring-white/10" />
+                              <div className="min-w-0">
+                                <div className="text-sm font-bold truncate text-foreground">{h.title}</div>
+                                <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{h.type}</div>
+                              </div>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                      <button
+                        onClick={() => submitSearch(query)}
+                        className="w-full text-left px-3 py-2.5 border-t border-white/5 text-xs font-extrabold uppercase tracking-[0.2em] text-primary hover:bg-white/5"
+                      >
+                        See all results for "{query}" →
+                      </button>
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
+          {/* THEME */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Theme" className="text-white hover:text-primary hover:bg-white/10">
+              <Button variant="ghost" size="icon" aria-label="Theme" className="focus-ring text-white hover:text-primary hover:bg-white/10">
                 {theme === "magic" ? <Sparkles className="h-[18px] w-[18px]" /> : theme === "midnight" ? <Moon className="h-[18px] w-[18px]" /> : theme === "concrete" ? <Square className="h-[18px] w-[18px]" /> : <Palette className="h-[18px] w-[18px]" />}
               </Button>
             </DropdownMenuTrigger>
@@ -208,7 +297,7 @@ export function SiteHeader() {
               <CoinBadge coins={wallet?.coins ?? 0} />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-white/10"><User className="h-[18px] w-[18px]" /></Button>
+                  <Button variant="ghost" size="icon" className="focus-ring text-white hover:text-primary hover:bg-white/10"><User className="h-[18px] w-[18px]" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
@@ -223,13 +312,15 @@ export function SiteHeader() {
           ) : (
             <Button
               asChild
-              className="bg-primary !text-white hover:bg-primary/90 font-extrabold rounded-[4px] tracking-wider ring-1 ring-white/20 shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
+              variant="premium"
+              size="default"
+              className="focus-ring h-9 px-4 text-[12px]"
             >
               <Link to="/auth">SIGN IN</Link>
             </Button>
           )}
         </div>
       </div>
-    </header>
+    </motion.header>
   );
 }
