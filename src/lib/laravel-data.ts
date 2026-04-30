@@ -33,6 +33,14 @@ function mockFallback(table: string): Row[] {
   }
 }
 
+async function fetchJson<T>(path: string, fallback: T): Promise<T> {
+  try {
+    return await api.get<T>(path, { silent: true });
+  } catch {
+    return fallback;
+  }
+}
+
 /** True if the error means the backend is unreachable / down (not a real app error). */
 function isBackendDown(e: unknown): boolean {
   if (e instanceof ApiError) {
@@ -126,21 +134,21 @@ async function fetchTable(state: QueryState): Promise<{ data: Row[]; count: numb
       return { data: rows, count: rows.length };
     }
     case "chapter_unlocks": {
-      const res = await api.get<unknown>(`/user/unlocks`, { silent: true }).catch(() => []);
+      const res = await fetchJson<unknown>(`/user/unlocks`, []);
       const { rows } = unwrapList(res);
       return { data: rows, count: rows.length };
     }
     case "wallets": {
-      const res = await api.get<{ coins?: number }>(`/wallet/balance`, { silent: true }).catch(() => ({ coins: 0 }));
+      const res = await fetchJson<{ coins?: number }>(`/wallet/balance`, { coins: 0 });
       return { data: [{ coins: res?.coins ?? 0 }], count: 1 };
     }
     case "user_roles": {
-      const res = await api.get<unknown>(`/user/roles`, { silent: true }).catch(() => []);
+      const res = await fetchJson<unknown>(`/user/roles`, []);
       const { rows } = unwrapList(res);
       return { data: rows, count: rows.length };
     }
     case "site_settings": {
-      const res = await api.get<Row>(`/site-settings`, { silent: true }).catch(() => null);
+      const res = await fetchJson<Row | null>(`/site-settings`, null);
       return { data: res ? [res] : [], count: res ? 1 : 0 };
     }
     default:
