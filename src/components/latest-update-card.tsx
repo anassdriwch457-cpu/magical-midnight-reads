@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { Coins } from "lucide-react";
+import { Coins, Sparkles } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { resolveImage, onImageError } from "@/lib/image";
+import { motion, SPRING, useReducedMotion } from "@/lib/motion";
 
 type Series = Pick<Tables<"series">, "id" | "slug" | "title" | "cover_url" | "type">;
 type Chapter = Pick<Tables<"chapters">, "id" | "number" | "price" | "created_at">;
@@ -29,41 +30,49 @@ export function LatestUpdateCard({
   series: Series;
   chapters: Chapter[];
 }) {
+  const reduced = useReducedMotion();
   const isNew = (createdAt: string) => Date.now() - new Date(createdAt).getTime() < 1000 * 60 * 60 * 48;
 
   return (
-    <div className="flex gap-3 rounded-2xl overflow-hidden glass-card hover:ring-1 hover:ring-primary/40 transition-all duration-300 shadow-card hover:shadow-elev hover:-translate-y-0.5">
+    <motion.div
+      whileHover={reduced ? undefined : { y: -3 }}
+      transition={SPRING.soft}
+      className="flex gap-3 rounded-2xl overflow-hidden glass-card hover:ring-1 hover:ring-primary/40 shadow-card hover:shadow-elev transition-shadow inner-highlight"
+    >
       <Link
         to="/series/$slug"
         params={{ slug: series.slug }}
-        className="shrink-0 w-[92px] sm:w-[110px] aspect-[2/3] bg-muted overflow-hidden group"
+        className="focus-ring shrink-0 w-[96px] sm:w-[112px] aspect-[2/3] bg-muted overflow-hidden group relative"
       >
         <img
           src={resolveImage(series.cover_url)}
           onError={onImageError}
           alt={series.title}
           loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]"
+          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.08]"
         />
+        <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
       </Link>
 
-      <div className="flex-1 min-w-0 py-2 pr-2 flex flex-col">
+      <div className="flex-1 min-w-0 py-2.5 pr-2 flex flex-col">
         <Link
           to="/series/$slug"
           params={{ slug: series.slug }}
-          className="block px-2"
+          className="focus-ring rounded-md block px-2"
         >
-          <h3 className="font-bold text-sm text-foreground hover:text-primary transition-colors line-clamp-1">
+          <h3 className="font-extrabold text-sm text-foreground hover:text-primary transition-colors line-clamp-1">
             {series.title}
           </h3>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground mt-0.5 font-bold">
             {series.type === "manga" ? "Manga" : "Novel"}
           </p>
         </Link>
 
-        <ul className="mt-1.5 flex-1 divide-y divide-border/60">
+        <ul className="mt-2 flex-1 divide-y divide-border/50">
           {chapters.length === 0 && (
-            <li className="px-2 py-2 text-xs text-muted-foreground">No chapters yet</li>
+            <li className="px-2 py-2 text-xs text-muted-foreground inline-flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3" /> Coming soon
+            </li>
           )}
           {chapters.map((c) => {
             const free = c.price === 0;
@@ -73,10 +82,10 @@ export function LatestUpdateCard({
                 <Link
                   to="/series/$slug/chapter/$number"
                   params={{ slug: series.slug, number: String(c.number) }}
-                  className="grid grid-cols-[3.25rem_1fr_auto] items-center gap-2 px-2 py-1.5 hover:bg-white/5 transition-colors group"
+                  className="grid grid-cols-[3.4rem_1fr_auto] items-center gap-2 px-2 py-1.5 hover:bg-white/5 transition-colors group rounded-md"
                 >
                   <span
-                    className={`text-xs font-semibold tabular-nums truncate ${
+                    className={`text-xs font-extrabold tabular-nums truncate ${
                       free ? "text-white/85 group-hover:text-white" : "text-primary"
                     }`}
                   >
@@ -86,17 +95,17 @@ export function LatestUpdateCard({
                   <span className="flex items-center gap-1.5 min-w-0">
                     {free
                       ? fresh && (
-                          <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-white/10 text-white/70">
+                          <span className="text-[9px] font-extrabold uppercase tracking-[0.2em] px-1.5 py-0.5 rounded bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/20">
                             New
                           </span>
                         )
                       : (
                         <>
-                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary">
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-extrabold text-[var(--coin)]">
                             <Coins className="h-3 w-3" /> {c.price}
                           </span>
                           {fresh && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-primary text-primary-foreground">
+                            <span className="text-[9px] font-extrabold uppercase tracking-[0.2em] px-1.5 py-0.5 rounded bg-aurora text-white">
                               New
                             </span>
                           )}
@@ -104,7 +113,7 @@ export function LatestUpdateCard({
                       )}
                   </span>
 
-                  <span className="text-[10px] tabular-nums text-muted-foreground whitespace-nowrap text-right">
+                  <span className="text-[10px] tabular-nums text-muted-foreground whitespace-nowrap text-right font-mono">
                     {timeAgo(c.created_at)}
                   </span>
                 </Link>
@@ -113,6 +122,6 @@ export function LatestUpdateCard({
           })}
         </ul>
       </div>
-    </div>
+    </motion.div>
   );
 }
