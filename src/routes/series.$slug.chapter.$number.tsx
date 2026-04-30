@@ -439,7 +439,7 @@ function ReaderPage() {
             </div>
           ) : (
             pages.map((p, i) => (
-              <img
+              <motion.img
                 key={p.id}
                 src={p.image_url}
                 alt={`Page ${p.page_number}`}
@@ -449,6 +449,10 @@ function ReaderPage() {
                 draggable={false}
                 crossOrigin="anonymous"
                 onLoad={(e) => { if (i < 4) samplePage(e.currentTarget, p.id); }}
+                initial={{ opacity: 0, y: 8 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-10% 0px -10% 0px" }}
+                transition={{ duration: 0.45, ease: [0.22, 0.61, 0.36, 1] }}
                 className="w-full block select-none [content-visibility:auto] [contain-intrinsic-size:1200px] shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
               />
             ))
