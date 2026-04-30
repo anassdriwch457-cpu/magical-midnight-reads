@@ -170,7 +170,9 @@ function createLaravelClient(): unknown {
           return { data: { user: cachedUser, session: { user: cachedUser, access_token: r.token } }, error: null };
         } catch (e) {
           const message = e instanceof ApiError
-            ? (e.status === 0 || e.status >= 500 ? 'Sign in is temporarily unavailable. Please try again shortly.' : e.message)
+            ? (e.message.includes('API route misconfigured')
+              ? e.message
+              : (e.status === 0 || e.status >= 500 ? 'Sign in is temporarily unavailable. Please try again shortly.' : e.message))
             : 'Sign in failed';
           return { data: { user: null, session: null }, error: { message } };
         }
@@ -187,7 +189,9 @@ function createLaravelClient(): unknown {
           return { data: { user: cachedUser, session: { user: cachedUser, access_token: r.token } }, error: null };
         } catch (e) {
           const message = e instanceof ApiError
-            ? (e.status === 0 || e.status >= 500 ? 'Sign up is temporarily unavailable. Please try again shortly.' : e.message)
+            ? (e.message.includes('API route misconfigured')
+              ? e.message
+              : (e.status === 0 || e.status >= 500 ? 'Sign up is temporarily unavailable. Please try again shortly.' : e.message))
             : 'Sign up failed';
           return { data: { user: null, session: null }, error: { message } };
         }
