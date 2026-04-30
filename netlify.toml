@@ -1,0 +1,21 @@
+# Netlify build configuration for TanStack Start (SSR + Functions).
+#
+# This deploys the app's SSR handler, server functions, and server routes
+# (including /api/public/stripe-webhook) as Netlify serverless functions.
+#
+# DO NOT add a `_redirects` file or `[[redirects]]` rewriting "/*" → "/index.html".
+# This is NOT a static SPA — there is no index.html shell. The Netlify TanStack
+# Start plugin handles all routing, deep links, and refreshes automatically by
+# routing every non-asset request through the SSR function.
+
+[build]
+  command = "vite build"
+  publish = "dist/client"
+
+[build.environment]
+  # Used by vite.config.ts to enable the @netlify/vite-plugin-tanstack-start adapter.
+  NETLIFY = "true"
+
+[dev]
+  command = "vite dev"
+  port = 3000
