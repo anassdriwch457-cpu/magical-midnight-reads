@@ -106,7 +106,27 @@ Vercel does not serve a static `dist/` — it runs the SSR server as a Node/Edge
 5. Output directory: leave **blank** — TanStack Start's adapter manages the output layout. Do not set it to `dist`.
 6. After first deploy, point the Stripe live webhook at `https://<project>.vercel.app/api/public/stripe-webhook`.
 
-## 7. Caching & Performance
+## 7. Netlify Deployment (SSR via Functions)
+
+This project ships with a `netlify.toml` and the official `@netlify/vite-plugin-tanstack-start` adapter. SSR, server functions, and the Stripe webhook all run as Netlify serverless functions — there is no static-only fallback.
+
+### ⚠️ Do NOT add `public/_redirects`
+
+Do **not** create a `_redirects` file with `/* /index.html 200`. This project has no `index.html` shell; routing is handled by the SSR function. A SPA-style catch-all redirect would intercept every request (including `/api/public/stripe-webhook`) and break the site.
+
+### Steps
+
+1. The Netlify plugin is already wired in `vite.config.ts` and only activates when `NETLIFY=true` (set by Netlify's build environment, also set in `netlify.toml`). Local Cloudflare/Lovable builds are unaffected.
+2. In the Netlify dashboard → **Site settings → Environment variables**, add every variable from section 2 (both the `VITE_*` public ones AND the unprefixed server secrets including `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`).
+3. Build command: `vite build`  ·  Publish directory: `dist/client`  ·  Functions are auto-detected by the plugin.
+4. Deploy: `npx netlify deploy --build --prod` (or push to a branch connected to the site).
+5. After first deploy, point the Stripe live webhook at `https://<your-site>.netlify.app/api/public/stripe-webhook`.
+
+### Verify routing works
+
+After deploy, hard-refresh `/series/<slug>`, `/topup`, and any other deep link. They should all render correctly. If a route 404s, the route file under `src/routes/` is missing — fix the route file, do not add a `_redirects` rewrite.
+
+## 8. Caching & Performance
 
 - `@tanstack/react-query` is wired through router context — DB updates show on next route load (or `router.invalidate()` for instant refresh). No rebuild needed.
 - Reader uses `loading="lazy"`, `decoding="async"`, `fetchPriority`, and CSS `content-visibility: auto`.
