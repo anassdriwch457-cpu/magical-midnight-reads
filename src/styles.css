@@ -114,10 +114,11 @@
     radial-gradient(at 78% 86%,  oklch(0.28 0.18 280 / 0.35) 0px, transparent 55%),
     radial-gradient(at 18% 92%,  oklch(0.26 0.14 200 / 0.22) 0px, transparent 60%);
 
-  --shadow-glow: 0 6px 24px oklch(0.74 0.18 50 / 0.22);
-  --shadow-glow-purple: 0 6px 28px oklch(0.62 0.20 305 / 0.30);
-  --shadow-card: 0 8px 28px oklch(0.04 0 0 / 0.55);
-  --shadow-elev: 0 24px 60px -20px oklch(0.04 0 0 / 0.7);
+  /* Softer ambient shadows — layered, low-opacity, premium feel */
+  --shadow-glow: 0 4px 20px oklch(0.74 0.18 50 / 0.16);
+  --shadow-glow-purple: 0 4px 22px oklch(0.62 0.20 305 / 0.20);
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.20), 0 8px 24px -12px oklch(0 0 0 / 0.45);
+  --shadow-elev: 0 1px 2px oklch(0 0 0 / 0.25), 0 30px 70px -28px oklch(0 0 0 / 0.65);
 
   /* Atmospheric depth tiers — apply via .depth-{0..3} */
   --depth-0: none;
