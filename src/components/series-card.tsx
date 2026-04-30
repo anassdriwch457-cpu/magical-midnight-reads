@@ -2,12 +2,14 @@ import { Link } from "@tanstack/react-router";
 import type { Tables } from "@/integrations/supabase/types";
 import { resolveImage, onImageError } from "@/lib/image";
 import { GenreTag } from "@/components/genre-tag";
+import { motion, SPRING, useReducedMotion } from "@/lib/motion";
 
 export function SeriesCard({
   series,
 }: {
   series: Pick<Tables<"series">, "slug" | "title" | "cover_url" | "type" | "genres">;
 }) {
+  const reduced = useReducedMotion();
   const typeLabel = series.type === "manga" ? "Manga" : "Novel";
   const firstGenre = series.genres?.[0];
 
@@ -15,13 +17,15 @@ export function SeriesCard({
     <Link
       to="/series/$slug"
       params={{ slug: series.slug }}
-      className="group block"
+      className="focus-ring group block rounded-xl"
     >
-      <div
+      <motion.div
+        whileHover={reduced ? undefined : { y: -6, scale: 1.025 }}
+        whileTap={reduced ? undefined : { scale: 0.98 }}
+        transition={SPRING.soft}
         className="glow-halo relative aspect-[2/3] overflow-hidden rounded-xl bg-muted
                    shadow-card ring-1 ring-border/50
-                   transition-all duration-500 ease-out
-                   group-hover:-translate-y-1 group-hover:shadow-elev group-hover:ring-primary/50"
+                   group-hover:shadow-elev group-hover:ring-primary/50 will-change-transform"
       >
         <img
           src={resolveImage(series.cover_url)}
@@ -48,7 +52,7 @@ export function SeriesCard({
             {series.title}
           </h3>
         </div>
-      </div>
+      </motion.div>
       {firstGenre && (
         <div className="pt-2 flex">
           <GenreTag name={firstGenre} size="xs" asLink={false} />
