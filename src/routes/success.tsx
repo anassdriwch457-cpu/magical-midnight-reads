@@ -77,7 +77,8 @@ function SuccessPage() {
 
   return (
     <div className="container mx-auto px-4 py-16 max-w-xl">
-      <div className="rounded-2xl border border-border bg-card p-8 text-center">
+      {sparkle && <SparkleBurst onDone={() => setSparkle(false)} />}
+      <div className="rounded-2xl glass-card p-8 text-center shadow-elev animate-scale-in">
         {status === "verifying" && (
           <>
             <Loader2 className="mx-auto h-10 w-10 text-primary animate-spin mb-4" />
