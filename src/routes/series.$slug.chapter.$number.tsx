@@ -104,7 +104,7 @@ function ReaderPage() {
         setPages(loadedPages);
         setPagesLoading(false);
         if (loadedPages.length === 0) {
-          setDebugMessage(`Debug: Chapter ID ${currentChapter.id} reached. No images found in Supabase.`);
+          setDebugMessage(`Debug: Chapter ID ${currentChapter.id} reached. No images were returned from your Laravel API.`);
         }
         return;
       }
@@ -465,7 +465,7 @@ function ReaderPage() {
                   <AlertCircle className="h-5 w-5 mt-0.5" />
                   <div className="space-y-2">
                     <h2 className="text-lg font-bold text-foreground">No reader images found</h2>
-                    <p className="text-sm text-muted-foreground">{debugMessage ?? `Debug: Chapter ID ${chapter.id} reached. No images found in Supabase.`}</p>
+                     <p className="text-sm text-muted-foreground">{debugMessage ?? `Debug: Chapter ID ${chapter.id} reached. No images were returned from your Laravel API.`}</p>
                     {errorMessage && <p className="text-xs text-destructive">{errorMessage}</p>}
                   </div>
                 </div>

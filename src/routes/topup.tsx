@@ -1,11 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Coins, Sparkles, Check, Zap, Crown, Star, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { COIN_PACKAGES, createCoinCheckout } from "@/server/topup.functions";
 
 const ICONS = [Coins, Star, Zap, Crown];
 
@@ -20,30 +18,10 @@ export const Route = createFileRoute("/topup")({
 });
 
 function TopupPage() {
-  const { user, session, wallet } = useAuth();
-  const checkout = useServerFn(createCoinCheckout);
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const { user, wallet } = useAuth();
 
-  const handleBuy = async (packageId: string) => {
-    if (!user || !session?.access_token) {
-      toast.error("Please sign in again");
-      return;
-    }
-    setPendingId(packageId);
-    try {
-      const res = await checkout({
-        data: { packageId },
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (!res?.url) {
-        throw new Error("Could not start checkout");
-      }
-      // Redirect to Stripe-hosted checkout.
-      window.location.href = res.url;
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not start checkout");
-      setPendingId(null);
-    }
+  const handleBuy = async () => {
+    toast.info("Coin top-up still needs your Laravel payment endpoint connected.");
   };
 
   return (
@@ -73,10 +51,14 @@ function TopupPage() {
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {COIN_PACKAGES.map((p, i) => {
+            {[
+              { id: "starter", label: "Starter Pack", coins: 100, bonus: 0, price: 1.99 },
+              { id: "popular", label: "Reader Pack", coins: 550, bonus: 50, price: 9.99, popular: true },
+              { id: "value", label: "Collector Pack", coins: 1200, bonus: 200, price: 19.99 },
+              { id: "legend", label: "Legend Pack", coins: 3000, bonus: 600, price: 44.99 },
+            ].map((p, i) => {
               const Icon = ICONS[i] ?? Coins;
               const total = p.coins + p.bonus;
-              const isPending = pendingId === p.id;
               const popular = "popular" in p && p.popular;
               return (
                 <div
@@ -113,11 +95,10 @@ function TopupPage() {
                   </div>
 
                   <Button
-                    disabled={isPending}
-                    onClick={() => handleBuy(p.id)}
+                    onClick={handleBuy}
                     className="w-full mt-5 bg-brand text-primary-foreground border-0 font-bold rounded-[4px] h-11"
                   >
-                    {isPending ? "PROCESSING…" : "BUY NOW"}
+                    BUY NOW
                   </Button>
                 </div>
               );
