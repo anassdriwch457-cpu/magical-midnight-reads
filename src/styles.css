@@ -15,6 +15,35 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Z-INDEX SCALE — single source of truth for stacking */
+  --z-base: 0;
+  --z-content: 10;
+  --z-sticky: 20;
+  --z-overlay: 30;
+  --z-nav: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+  --z-cursor: 70;
+
+  /* GOLDEN-RATIO SPACING (φ ≈ 1.618), tuned for 4px base */
+  --space-1: 0.25rem;     /*  4px */
+  --space-2: 0.5rem;      /*  8px */
+  --space-3: 0.8125rem;   /* 13px (≈8·φ) */
+  --space-5: 1.3125rem;   /* 21px (≈13·φ) */
+  --space-8: 2.125rem;    /* 34px (≈21·φ) */
+  --space-13: 3.4375rem;  /* 55px (≈34·φ) */
+  --space-21: 5.5625rem;  /* 89px (≈55·φ) */
+
+  /* TYPE SCALE — major-third (1.25) for body, golden for display */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.1875rem;
+  --text-xl: 1.4375rem;
+  --text-2xl: 1.8125rem;
+  --text-3xl: 2.3125rem;
+  --text-display: 3.75rem;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -86,6 +115,12 @@
   --shadow-glow-purple: 0 6px 28px oklch(0.62 0.20 305 / 0.30);
   --shadow-card: 0 8px 28px oklch(0.04 0 0 / 0.55);
   --shadow-elev: 0 24px 60px -20px oklch(0.04 0 0 / 0.7);
+
+  /* Atmospheric depth tiers — apply via .depth-{0..3} */
+  --depth-0: none;
+  --depth-1: 0 2px 6px oklch(0 0 0 / 0.30), 0 1px 2px oklch(0 0 0 / 0.20);
+  --depth-2: 0 8px 24px -8px oklch(0 0 0 / 0.55), 0 2px 6px oklch(0 0 0 / 0.25);
+  --depth-3: 0 24px 60px -20px oklch(0 0 0 / 0.7), 0 4px 12px oklch(0 0 0 / 0.4);
 }
 
 /* MIDNIGHT — pure dark, royal blue */
@@ -333,6 +368,45 @@
     font-style: italic;
     font-weight: 600;
     letter-spacing: 0.02em;
+  }
+
+  /* Atmospheric depth utilities */
+  .depth-1 { box-shadow: var(--depth-1); }
+  .depth-2 { box-shadow: var(--depth-2); }
+  .depth-3 { box-shadow: var(--depth-3); }
+
+  /* Premium focus ring — visible, on-brand, no layout shift */
+  .focus-ring {
+    outline: none;
+  }
+  .focus-ring:focus-visible {
+    box-shadow:
+      0 0 0 2px var(--background),
+      0 0 0 4px color-mix(in oklab, var(--primary) 80%, transparent),
+      0 0 18px color-mix(in oklab, var(--primary) 50%, transparent);
+    border-radius: inherit;
+  }
+
+  /* Display heading utility (golden-ratio scale) */
+  .text-display {
+    font-size: var(--text-display);
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+    font-weight: 800;
+  }
+
+  /* Ambient breathing accent dot/glow */
+  .ambient-dot {
+    background: var(--gradient-aurora);
+    box-shadow: 0 0 24px color-mix(in oklab, var(--primary) 60%, transparent);
+    animation: ambient-breathe 4.5s ease-in-out infinite;
+  }
+
+  /* Subtle inner glass highlight (use on raised cards) */
+  .inner-highlight {
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, white 8%, transparent),
+      inset 0 0 0 1px color-mix(in oklab, white 3%, transparent);
   }
 }
 

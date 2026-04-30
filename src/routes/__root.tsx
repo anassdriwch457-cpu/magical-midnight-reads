@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { MobileNav } from "@/components/mobile-nav";
 import { Toaster } from "@/components/ui/sonner";
+import { PageTransition } from "@/components/page-transition";
 
 function NotFoundComponent() {
   return (
@@ -57,7 +58,11 @@ function RootComponent() {
     <ThemeProvider>
       <AuthProvider>
         <SiteHeader />
-        <main className="pt-0 pb-20 md:pb-0"><Outlet /></main>
+        <main className="pt-0 pb-20 md:pb-0">
+          <PageTransition>
+            <Outlet />
+          </PageTransition>
+        </main>
         <SiteFooter />
         <MobileNav />
         <Toaster richColors position="top-center" />
