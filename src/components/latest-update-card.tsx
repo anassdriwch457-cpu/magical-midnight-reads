@@ -77,7 +77,7 @@ export function LatestUpdateCard({
                 >
                   <span
                     className={`text-xs font-semibold tabular-nums truncate ${
-                      free ? "text-white/85 group-hover:text-white" : "text-[#F47521]"
+                      free ? "text-white/85 group-hover:text-white" : "text-primary"
                     }`}
                   >
                     Ch. {Number(c.number)}
@@ -92,11 +92,11 @@ export function LatestUpdateCard({
                         )
                       : (
                         <>
-                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#F47521]">
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary">
                             <Coins className="h-3 w-3" /> {c.price}
                           </span>
                           {fresh && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-[#F47521] text-black">
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-primary text-primary-foreground">
                               New
                             </span>
                           )}
