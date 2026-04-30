@@ -6,7 +6,31 @@
  */
 
 const RAW_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
-export const API_BASE_URL = RAW_BASE ? RAW_BASE.replace(/\/$/, "") : "";
+
+function normalizeApiBaseUrl(value?: string): string {
+  if (!value) return "";
+
+  const trimmed = value.trim().replace(/\/$/, "");
+  if (!trimmed) return "";
+
+  try {
+    const url = new URL(trimmed);
+    const normalizedPath = url.pathname.replace(/\/$/, "");
+    const looksLikeFrontendRoot = normalizedPath === "" || normalizedPath === "/";
+
+    if (looksLikeFrontendRoot) {
+      url.pathname = "/api";
+    } else {
+      url.pathname = normalizedPath;
+    }
+
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return trimmed;
+  }
+}
+
+export const API_BASE_URL = normalizeApiBaseUrl(RAW_BASE);
 export const HAS_LARAVEL_API = !!API_BASE_URL;
 
 const TOKEN_KEY = "auth_token";
@@ -106,11 +130,15 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   if (!res.ok) {
-    const message =
+    const rawMessage =
       (data && typeof data === "object" && "message" in data &&
         typeof (data as { message: unknown }).message === "string"
         ? (data as { message: string }).message
         : null) ?? res.statusText ?? `Request failed (${res.status})`;
+    const message =
+      typeof rawMessage === "string" && rawMessage.includes("Only HTML requests are supported here")
+        ? `API route misconfigured. Set VITE_API_URL to your Laravel API base, e.g. https://your-domain.com/api${path.startsWith("/") ? path : `/${path}`} was requested from ${url}.`
+        : rawMessage;
     if (res.status === 401) clearAuthToken();
     const err = new ApiError(message, res.status, data);
     if (!silent && res.status >= 500) emitError(err);
