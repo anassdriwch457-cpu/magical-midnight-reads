@@ -400,6 +400,9 @@ function ReaderPage() {
     );
   }
 
+  const goToChapter = (n: number) =>
+    navigate({ to: "/series/$slug/chapter/$number", params: { slug, number: String(n) } });
+
   return (
     <div ref={scrollerRef} className="fixed inset-0 bg-black overflow-y-auto z-30 [scroll-behavior:smooth]">
       {/* Ambient light backdrop reflecting current page color */}
@@ -411,6 +414,37 @@ function ReaderPage() {
           filter: "blur(60px) saturate(120%)",
         }}
       />
+
+      {/* Mobile edge tap zones for chapter nav */}
+      {siblings.prev !== undefined && (
+        <button
+          aria-label="Previous chapter"
+          onClick={() => goToChapter(siblings.prev!)}
+          className="md:hidden fixed left-0 top-1/2 -translate-y-1/2 z-20 h-32 w-10 grid place-items-center text-white/0 active:text-white/80 active:bg-white/5 transition-colors"
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+      )}
+      {siblings.next !== undefined && (
+        <button
+          aria-label="Next chapter"
+          onClick={() => goToChapter(siblings.next!)}
+          className="md:hidden fixed right-0 top-1/2 -translate-y-1/2 z-20 h-32 w-10 grid place-items-center text-white/0 active:text-white/80 active:bg-white/5 transition-colors"
+        >
+          <ChevronRight className="h-6 w-6" />
+        </button>
+      )}
+
+      {/* Reading-time chip — shown briefly on entry */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: [0, 1, 1, 0], y: [-10, 0, 0, -10] }}
+        transition={{ duration: 3.4, times: [0, 0.15, 0.85, 1], delay: 0.6 }}
+        className="pointer-events-none fixed top-20 left-1/2 -translate-x-1/2 z-30 inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.18em] text-white/90"
+      >
+        Chapter {Number(chapter.number)}
+        {pages.length > 0 && <span className="text-white/55">· ~{Math.max(1, Math.ceil(pages.length * 0.4))} min</span>}
+      </motion.div>
 
       {renderProgressBar()}
       {renderTopBar()}
