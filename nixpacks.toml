@@ -1,0 +1,16 @@
+# Coolify / Nixpacks build configuration
+# Forces the builder to use Bun instead of npm so `npm ci` is never invoked.
+
+providers = ["node"]
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "bun"]
+
+[phases.install]
+cmds = ["bun install --frozen-lockfile"]
+
+[phases.build]
+cmds = ["bun run build"]
+
+[start]
+cmd = "bun run start"
