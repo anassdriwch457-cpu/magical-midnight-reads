@@ -10,6 +10,9 @@ interface Session {
 interface User {
   id: string;
   email?: string;
+  roles?: Role[];
+  coins?: number;
+  display_name?: string;
   user_metadata?: {
     display_name?: string;
   };
@@ -53,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const normalizeUser = (payload: { id: string | number; email?: string; name?: string }): User => ({
     id: String(payload.id),
     email: payload.email,
+    display_name: payload.name,
     user_metadata: { display_name: payload.name },
   });
 
@@ -62,8 +66,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         api.get<{ coins: number }>("/wallet/balance", { silent: true }),
         api.get<Array<{ role: Role }>>("/user/roles", { silent: true }).catch(() => []),
       ]);
-      setWallet({ coins: coins ?? 0 });
-      setRoles((rolesResponse ?? []).map((x) => x.role as Role));
+      const nextCoins = coins ?? 0;
+      const nextRoles = (rolesResponse ?? []).map((x) => x.role as Role);
+      setWallet({ coins: nextCoins });
+      setRoles(nextRoles);
+      setUser((prev) => prev ? { ...prev, coins: nextCoins, roles: nextRoles } : prev);
     } catch (err) {
       console.error("Failed to load user data", err);
       setWallet({ coins: 0 });
