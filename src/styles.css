@@ -541,3 +541,21 @@
     animation: none !important;
   }
 }
+
+@keyframes gradient-pan {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+.animate-gradient { animation: gradient-pan 8s ease-in-out infinite; }
+
+@keyframes marquee-x {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee { animation: marquee-x 28s linear infinite; }
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 50%, transparent); }
+  50%      { box-shadow: 0 0 24px 6px color-mix(in oklab, var(--primary) 35%, transparent); }
+}
+.animate-glow-pulse { animation: glow-pulse 3.4s ease-in-out infinite; }
