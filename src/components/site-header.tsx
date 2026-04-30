@@ -73,18 +73,21 @@ export function SiteHeader() {
   return (
     <header
       className={`fixed top-0 z-40 w-full transition-all duration-300 ${
-        scrolled
-          ? "glass-strong border-b border-white/10 shadow-[0_4px_20px_-12px_rgba(0,0,0,0.6)]"
-          : "bg-gradient-to-b from-black/70 via-black/30 to-transparent backdrop-blur-sm border-b border-transparent"
+      scrolled
+          ? "glass-strong shadow-[0_4px_20px_-12px_rgba(0,0,0,0.6)]"
+          : "bg-gradient-to-b from-black/65 via-black/25 to-transparent backdrop-blur-sm border-b border-transparent"
       }`}
     >
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link to="/" className="flex items-center gap-2.5">
-          <img src={logo} alt="Nuvia Toon" width={32} height={32} className="brightness-0 invert" />
+        <Link to="/" className="haptic flex items-center gap-2.5 group">
+          <img src={logo} alt="Nuvia Toon" width={32} height={32} className="brightness-0 invert transition-transform duration-500 group-hover:rotate-[8deg]" />
           <div className="leading-tight">
-            <div className="text-[17px] font-extrabold tracking-tight text-white">Nuvia Toon</div>
-            <div className="text-[9px] uppercase tracking-[0.18em] text-white/60 font-medium">
-              Your Next Paradise in Every Page
+            <div className="text-[19px] font-extrabold tracking-tight text-white">
+              <span className="wordmark text-aurora">Nuvia</span>
+              <span className="wordmark text-white/90"> Toon</span>
+            </div>
+            <div className="text-[9px] uppercase tracking-[0.22em] text-white/55 font-medium">
+              Your Next <span className="wordmark not-italic font-semibold text-primary/90">Paradise</span> in Every Page
             </div>
           </div>
         </Link>
