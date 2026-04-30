@@ -1,5 +1,5 @@
-— Coolify / Nixpacks build configuration
-— Forces the builder to use Bun instead of npm so `npm ci` is never invoked.
+# Coolify / Nixpacks build configuration
+# Forces the builder to use Bun instead of npm so `npm ci` is never invoked.
 
 providers = ["node"]
 

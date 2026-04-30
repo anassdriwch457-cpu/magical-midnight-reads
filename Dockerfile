@@ -1,5 +1,5 @@
-— Production Dockerfile for Coolify / any Docker-based host.
-— Uses Bun (matches bun.lockb). Do NOT switch to npm — there is no package-lock.json.
+# Production Dockerfile for Coolify / any Docker-based host.
+# Uses Bun (matches bun.lockb). Do NOT switch to npm — there is no package-lock.json.
 
 FROM oven/bun:1.1 AS deps
 WORKDIR /app
