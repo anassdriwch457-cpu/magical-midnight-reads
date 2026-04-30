@@ -65,6 +65,7 @@ function SuccessPage() {
         setBalance(res.balance ?? null);
         await refreshWallet();
         if (!res.alreadyCredited) {
+          setSparkle(true);
           toast.success(`+${res.credited} coins added!`);
         }
       } catch (e) {
