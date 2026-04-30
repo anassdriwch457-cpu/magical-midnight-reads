@@ -2,8 +2,8 @@
 @source "../src";
 @import "tw-animate-css";
 
-/* Premium fonts: Inter (body), Cormorant Garamond (display wordmark), JetBrains Mono (numerics) */
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap");
+/* Editorial type system — Inter (body) + Outfit (headings). Cormorant kept for the italic wordmark only. JetBrains Mono for numerics. */
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@300;400;500&family=Outfit:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
@@ -217,13 +217,19 @@
     background-size: 100% 100%;
     position: relative;
   }
-  /* Premium typography defaults — Apple-style tight tracking on headings */
+  /* Editorial heading defaults — Outfit, light weight, tight tracking */
   h1, h2, h3, h4, h5, h6 {
-    letter-spacing: -0.022em;
-    font-weight: 600;
+    font-family: "Outfit", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.02em;
+    font-weight: 300;
+    color: hsl(var(--foreground, var(--color-foreground)));
   }
-  h1 { letter-spacing: -0.03em; }
-  h2 { letter-spacing: -0.025em; }
+  h1 { font-weight: 300; line-height: 1.0; }
+  h2 { font-weight: 300; line-height: 1.05; }
+  h3 { font-weight: 300; line-height: 1.1; }
+  h4, h5, h6 { font-weight: 400; line-height: 1.15; }
+  strong, b { font-weight: 500; }
+  button, [role="button"] { font-weight: 500; letter-spacing: -0.005em; }
   /* Smooth global transitions for color/background/border */
   a, button {
     transition-property: color, background-color, border-color, opacity, transform, box-shadow, filter;
@@ -483,9 +489,22 @@
       inset 0 1px 0 color-mix(in oklab, white 8%, transparent),
       inset 0 0 0 1px color-mix(in oklab, white 3%, transparent);
   }
-}
 
-/* ============ KEYFRAMES ============ */
+  /* ===== Editorial weight cap — no bulky type anywhere.
+     Remap Tailwind weight classes: nothing heavier than 500 renders. ===== */
+  .font-thin, .font-extralight, .font-light { font-weight: 300 !important; }
+  .font-normal { font-weight: 400 !important; }
+  .font-medium, .font-semibold, .font-bold, .font-extrabold, .font-black { font-weight: 500 !important; }
+
+  /* Editorial heading utility (for non-h1-h6 elements) */
+  .font-heading {
+    font-family: "Outfit", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.02em;
+    font-weight: 300;
+  }
+  .tracking-heading { letter-spacing: -0.02em; }
+  .text-balance { text-wrap: balance; }
+}
 @keyframes shimmer {
   0%   { background-position: 220% 0; }
   100% { background-position: -220% 0; }
