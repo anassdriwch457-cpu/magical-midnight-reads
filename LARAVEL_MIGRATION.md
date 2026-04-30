@@ -1,67 +1,59 @@
-# Laravel Backend Migration
+# Laravel Backend Integration
 
-Project is being migrated from Supabase to a Laravel 11 + MySQL backend with Sanctum bearer-token auth. Migration is **incremental** — Supabase code still powers existing features until you swap them feature-by-feature.
+The frontend automatically switches data source based on env vars:
 
-## What's in place
+| `VITE_API_URL` set | `VITE_SUPABASE_URL` set | Mode |
+|---|---|---|
+| ✅ | — | **Laravel** (live API) |
+| — | ✅ | Supabase (legacy) |
+| — | — | **Mock** (offline preview) |
 
-- `src/lib/api.ts` — fetch wrapper. Reads `VITE_API_URL`, attaches `Authorization: Bearer <token>` from `localStorage`, throws typed `ApiError` on non-2xx.
-- `src/lib/laravel-auth.tsx` — reference `LaravelAuthProvider` / `useLaravelAuth()` hitting `/login`, `/register`, `/logout`, `/user`.
-
-## Configure
-
-Set the API base URL (Coolify env var or `.env.local`):
-
-```
-VITE_API_URL=https://api.yourdomain.com/api
+Set on Coolify / VPS:
+```env
+VITE_API_URL=https://api.your-domain.com/api
 ```
 
-Defaults to `http://localhost:8000/api` if unset.
+## Required Laravel endpoints
 
-## Required Laravel endpoints (Sanctum)
+All authenticated endpoints expect `Authorization: Bearer <sanctum_token>`.
 
-```
-POST /api/login            { email, password }                  -> { token, user }
-POST /api/register         { name, email, password, password_confirmation } -> { token, user }
-POST /api/logout           (auth:sanctum)                       -> 204
-GET  /api/user             (auth:sanctum)                       -> user object
-```
+### Auth
+- `POST /login`     `{ email, password }` → `{ token, user: { id, name, email } }`
+- `POST /register`  `{ name, email, password, password_confirmation }` → `{ token, user }`
+- `POST /logout`    → 204
+- `GET  /user`      → `{ id, name, email, ... }`
 
-In your Laravel `routes/api.php`:
+### Content (public)
+- `GET /series`
+  Query params: `type`, `status`, `genre`, `q`, `sort`, `dir`, `page`, `per_page`, `trending`, `popular`, `exclude_id`, `ids`, `slug`
+  Returns: `{ data: Series[], total: number }` or `Series[]`
+- `GET /series/{seriesId}/chapters` → `Chapter[]`
+- `GET /chapters/{id}/pages` → `Page[]` (manga pages)
+- `GET /site-settings` → `{ site_name, seo_description }`
 
-```php
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/register', [AuthController::class, 'register']);
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/user', fn (Request $r) => $r->user());
-});
-```
+### Wallet & unlocks (authenticated)
+- `GET  /wallet/balance`        → `{ coins: number }`
+- `GET  /user/unlocks`          → `[{ chapter_id }]`
+- `GET  /user/roles`            → `[{ role }]`
+- `POST /chapters/{id}/unlock`  → `{ success, balance, error? }`
 
-Make sure `config/cors.php` allows your frontend origin and the `Authorization` header.
+## Field shapes (Series / Chapter)
 
-## Migration pattern (per feature)
-
-1. Build the Laravel endpoint(s).
-2. In the React component, replace the `supabase.from(...)` call with `api.get/post/...`.
-3. Replace `useAuth()` (Supabase) with `useLaravelAuth()` once `/login` works.
-4. Delete the corresponding Supabase code only after the feature is fully migrated.
-
-Example:
+The frontend reads these fields directly — keep names identical:
 
 ```ts
-// Before
-const { data } = await supabase.from("series").select("*").eq("slug", slug).single();
+Series  { id, slug, title, type:'manga'|'novel', status:'ongoing'|'completed'|'hiatus',
+          author?, artist?, description, cover_url, banner_url?, genres: string[],
+          is_trending, is_popular, views, rating, created_at, updated_at }
 
-// After
-const data = await api.get<Series>(`/series/${slug}`);
+Chapter { id, series_id, number, title?, content?, price, created_at, updated_at }
+
+Page    { id, chapter_id, page_number, image_url }
 ```
 
-## Don't yet remove
+## Error handling
 
-These still depend on Supabase and will break if env vars are stripped:
-- `src/lib/auth.tsx`, `src/integrations/supabase/*`
-- `src/server/*.functions.ts`, `src/routes/api/public/stripe-webhook.ts`
-- `src/routes/auth.tsx`, `src/routes/admin.tsx`, `src/routes/topup.tsx`, `src/routes/success.tsx`
-- `src/routes/series.*`, `src/routes/browse.tsx`, `src/routes/index.tsx` (all read from Supabase)
-
-Migrate them one at a time, then remove the Supabase client + `.env` entries last.
+- Non-2xx and network failures throw `ApiError` (see `src/lib/api.ts`).
+- 5xx + network errors trigger a global toast ("Service temporarily unavailable").
+- 401 auto-clears the bearer token.
+- Query builder calls (`supabase.from(...)`) return `{ data: [], error: { message } }` on failure — UI degrades to empty states instead of crashing.
