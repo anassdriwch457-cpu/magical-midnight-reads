@@ -385,12 +385,49 @@
   .stagger > *:nth-child(11) { animation-delay: 440ms; }
   .stagger > *:nth-child(12) { animation-delay: 480ms; }
 
-  /* Brand wordmark — high-fashion */
+  /* Brand wordmark — high-fashion italic serif */
   .wordmark {
-    font-family: ui-serif, "Cormorant Garamond", "Playfair Display", Georgia, serif;
+    font-family: "Cormorant Garamond", ui-serif, Georgia, serif;
     font-style: italic;
     font-weight: 600;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.005em;
+  }
+  .wordmark-bold { font-weight: 700; }
+
+  /* Section eyebrow / kicker */
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: color-mix(in oklab, var(--foreground) 60%, transparent);
+  }
+
+  /* Animated gradient stroke (frame for hero, featured cards) */
+  .gradient-stroke {
+    position: relative;
+    isolation: isolate;
+  }
+  .gradient-stroke::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: var(--gradient-aurora);
+    background-size: 200% 200%;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    animation: gradient-pan 8s ease-in-out infinite;
+  }
+
+  /* Marquee label for trending */
+  .marquee-glow {
+    text-shadow:
+      0 0 8px color-mix(in oklab, var(--primary) 70%, transparent),
+      0 0 22px color-mix(in oklab, var(--primary) 35%, transparent);
   }
 
   /* Atmospheric depth utilities */
