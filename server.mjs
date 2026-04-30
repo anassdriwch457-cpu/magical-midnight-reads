@@ -37,9 +37,13 @@ if (!serverFile) {
 }
 
 const mod = await import(pathToFileURL(serverFile).href);
-const fetchHandler = mod.default;
-if (typeof fetchHandler !== "function") {
-  console.error(`[server] ${serverFile} has no default fetch handler export.`);
+// TanStack Start exports an object with a `fetch` method as default; some
+// targets export the fetch function directly. Support both.
+const entry = mod.default;
+const fetchHandler =
+  typeof entry === "function" ? entry : typeof entry?.fetch === "function" ? entry.fetch.bind(entry) : null;
+if (!fetchHandler) {
+  console.error(`[server] ${serverFile} has no usable default fetch handler.`);
   process.exit(1);
 }
 
