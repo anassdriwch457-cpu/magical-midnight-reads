@@ -15,7 +15,7 @@ import {
   Coins, Sparkles, Moon, Square, User, LogOut, Shield, Palette, Search, X,
 } from "lucide-react";
 import { CoinBadge } from "@/components/coin-badge";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/data-client";
 import logo from "@/assets/nuvia-logo.png";
 import { resolveImage, onImageError } from "@/lib/image";
 import { motion, AnimatePresence, SPRING } from "@/lib/motion";
@@ -32,7 +32,7 @@ const NAV = [
 ] as const;
 
 export function SiteHeader() {
-  const { user, wallet, isAdmin, signOut } = useAuth();
+  const { user, isAdmin, signOut } = useAuth();
   const { theme, setTheme, accent, setAccent } = useTheme();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -294,7 +294,7 @@ export function SiteHeader() {
 
           {user ? (
             <>
-              <CoinBadge coins={wallet?.coins ?? 0} />
+              <CoinBadge coins={user.coin_balance} />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="focus-ring text-white hover:text-primary hover:bg-white/10"><User className="h-[18px] w-[18px]" /></Button>

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import type { Tables } from "@/integrations/supabase/types";
+import { type Tables } from "@/lib/data-client";
 import { resolveImage, onImageError } from "@/lib/image";
 import { GenreTag } from "@/components/genre-tag";
 import { Eye, Play } from "lucide-react";

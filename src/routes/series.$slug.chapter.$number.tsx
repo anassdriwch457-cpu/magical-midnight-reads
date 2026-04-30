@@ -1,8 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, type Tables } from "@/lib/data-client";
 import { useAuth } from "@/lib/auth";
-import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Coins, Lock, Maximize2, Minimize2, ListOrdered } from "lucide-react";
 import { toast } from "sonner";
@@ -20,7 +19,7 @@ export const Route = createFileRoute("/series/$slug/chapter/$number")({
 
 function ReaderPage() {
   const { slug, number } = Route.useParams();
-  const { user, wallet, refreshWallet } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
 
   const [series, setSeries] = useState<Series | null>(null);
@@ -48,19 +47,9 @@ function ReaderPage() {
   const load = async () => {
     setLoading(true);
     setErrorMessage(null);
-    setDebugMessage(null);
-    setPages([]);
-    setPagesLoading(false);
-
     try {
-      const { data: s, error: seriesError } = await supabase
-        .from("series").select("*").eq("slug", slug).maybeSingle();
-      if (seriesError) throw seriesError;
-      if (!s) {
-        setSeries(null); setChapter(null);
-        setDebugMessage(`Debug: Series slug "${slug}" was reached, but no series was found.`);
-        return;
-      }
+      const { data: s } = await supabase.from("series").select("*").eq("slug", slug).maybeSingle();
+      if (!s) { setErrorMessage("Series not found"); setLoading(false); return; }
       setSeries(s);
 
       const { data: chapterRows, error: chaptersError } = await supabase
@@ -87,7 +76,7 @@ function ReaderPage() {
 
       let access = currentChapter.price === 0;
       if (user) {
-        const { data: u } = await supabase.from("chapter_unlocks").select("chapter_id").eq("user_id", user.id);
+        const { data: u } = await supabase.from("chapter_unlocks").select("chapter_id");
         const unlockedSet = new Set((u ?? []).map((x) => x.chapter_id));
         setUnlockedIds(unlockedSet);
         if (!access) access = unlockedSet.has(currentChapter.id);
@@ -207,7 +196,7 @@ function ReaderPage() {
       icon: "🔓",
       duration: 4000,
     });
-    await refreshWallet();
+    await refreshUser();
     await load();
   };
 
@@ -372,7 +361,7 @@ function ReaderPage() {
               <p className="text-sm text-muted-foreground mb-4">
                 Your balance:{" "}
                 <SpringNumber
-                  value={wallet?.coins ?? 0}
+                  value={user.coin_balance}
                   className="font-semibold text-foreground tabular-nums"
                 />
               </p>

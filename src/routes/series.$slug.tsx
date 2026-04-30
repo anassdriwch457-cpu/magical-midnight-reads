@@ -1,8 +1,7 @@
 import { createFileRoute, Link, Outlet, notFound, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, type Tables } from "@/lib/data-client";
 import { useAuth } from "@/lib/auth";
-import type { Tables } from "@/integrations/supabase/types";
 import {
   Lock, Coins, Eye, BookOpen, Check, Play, Star, Bookmark, ListOrdered, Clock, ArrowUpDown,
 } from "lucide-react";
@@ -25,7 +24,7 @@ export const Route = createFileRoute("/series/$slug")({
 function SeriesDetail() {
   const { slug } = Route.useParams();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [series, setSeries] = useState<Series | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
@@ -58,7 +57,7 @@ function SeriesDetail() {
           .order("views", { ascending: false })
           .limit(6),
         user
-          ? supabase.from("chapter_unlocks").select("chapter_id").eq("user_id", user.id)
+          ? supabase.from("chapter_unlocks").select("chapter_id")
           : Promise.resolve({ data: [] as { chapter_id: string }[] }),
       ]);
 

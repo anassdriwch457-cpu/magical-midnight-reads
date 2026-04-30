@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import { supabase, type Tables } from "@/lib/data-client";
 import { SeriesCard } from "@/components/series-card";
 import { Button } from "@/components/ui/button";
 import { GenreBar } from "@/components/genre-bar";

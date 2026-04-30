@@ -18,7 +18,7 @@ export const Route = createFileRoute("/topup")({
 });
 
 function TopupPage() {
-  const { user, wallet } = useAuth();
+  const { user } = useAuth();
 
   const handleBuy = async () => {
     toast.info("Coin top-up still needs your Laravel payment endpoint connected.");
@@ -35,7 +35,7 @@ function TopupPage() {
         {user && (
           <div className="inline-flex items-center gap-2 mt-5 rounded-full border border-border bg-card px-4 py-2">
             <Coins className="h-4 w-4 text-[var(--coin)]" />
-            <span className="font-bold tabular-nums">{wallet?.coins ?? 0}</span>
+            <span className="font-bold tabular-nums">{user.coin_balance}</span>
             <span className="text-muted-foreground text-sm">current balance</span>
           </div>
         )}

@@ -1,169 +1,133 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api, ApiError, clearAuthToken, getAuthToken, setAuthToken } from "@/lib/api";
 
-interface Wallet { coins: number }
-
-interface Session {
-  access_token: string | null;
-}
+export type Role = "user" | "admin" | "super_admin" | "manager";
 
 interface User {
   id: string;
-  email?: string;
-  roles?: Role[];
-  coins?: number;
-  display_name?: string;
-  user_metadata?: {
-    display_name?: string;
-  };
+  email: string;
+  name: string;
+  coin_balance: number;
+  roles: Role[];
 }
-
-export type Role = "user" | "admin" | "super_admin" | "manager";
 
 interface AuthCtx {
   user: User | null;
-  session: Session | null;
-  wallet: Wallet | null;
-  roles: Role[];
-  isAdmin: boolean;          // legacy: any staff role
+  loading: boolean;
+  isAdmin: boolean;
   isSuperAdmin: boolean;
   isManager: boolean;
-  isUploader: boolean;       // 'admin' role only (content uploader)
-  canManageContent: boolean; // super_admin || admin
-  canManageUsers: boolean;   // super_admin || manager
-  canViewAnalytics: boolean; // super_admin || manager
-  loading: boolean;
+  isUploader: boolean;
+  canManageContent: boolean;
+  canManageUsers: boolean;
+  canViewAnalytics: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
-  refreshWallet: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const syncSession = (token: string | null, nextUser: User | null) => {
-    setSession(token ? { access_token: token } : null);
-    setUser(nextUser);
-  };
-
-  const normalizeUser = (payload: { id: string | number; email?: string; name?: string }): User => ({
-    id: String(payload.id),
-    email: payload.email,
-    display_name: payload.name,
-    user_metadata: { display_name: payload.name },
-  });
-
-  const loadUserData = async () => {
+  const fetchUser = async () => {
     try {
-      const [{ coins }, rolesResponse] = await Promise.all([
-        api.get<{ coins: number }>("/wallet/balance", { silent: true }),
-        api.get<Array<{ role: Role }>>("/user/roles", { silent: true }).catch(() => []),
-      ]);
-      const nextCoins = coins ?? 0;
-      const nextRoles = (rolesResponse ?? []).map((x) => x.role as Role);
-      setWallet({ coins: nextCoins });
-      setRoles(nextRoles);
-      setUser((prev) => prev ? { ...prev, coins: nextCoins, roles: nextRoles } : prev);
+      const data = await api.get<User>("/user", { silent: true });
+      setUser(data);
     } catch (err) {
-      console.error("Failed to load user data", err);
-      setWallet({ coins: 0 });
-      setRoles([]);
+      console.error("Failed to fetch user", err);
+      if (err instanceof ApiError && err.status === 401) {
+        clearAuthToken();
+      }
+      setUser(null);
     }
   };
 
   useEffect(() => {
     const boot = async () => {
       const token = getAuthToken();
-      if (!token) {
-        syncSession(null, null);
-        setWallet(null);
-        setRoles([]);
-        setLoading(false);
-        return;
+      if (token) {
+        await fetchUser();
       }
-
-      try {
-        const me = await api.get<{ id: string | number; email?: string; name?: string }>("/user", { silent: true });
-        const nextUser = normalizeUser(me);
-        syncSession(token, nextUser);
-        await loadUserData();
-      } catch {
-        clearAuthToken();
-        syncSession(null, null);
-        setWallet(null);
-        setRoles([]);
-      } finally {
-        setLoading(false);
-      }
+      setLoading(false);
     };
-
     void boot();
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      const result = await api.post<{ token: string; user: { id: string | number; email?: string; name?: string } }>(
+      const { token, user: userData } = await api.post<{ token: string; user: User }>(
         "/login",
         { email, password },
         { anonymous: true }
       );
-      setAuthToken(result.token);
-      syncSession(result.token, normalizeUser(result.user));
-      await loadUserData();
+      setAuthToken(token);
+      setUser(userData);
       return { error: null };
     } catch (error) {
       return { error: error instanceof ApiError ? error.message : "Sign in failed" };
     }
   };
-  const signUp = async (email: string, password: string, displayName: string) => {
+
+  const signUp = async (email: string, password: string, name: string) => {
     try {
-      const result = await api.post<{ token: string; user: { id: string | number; email?: string; name?: string } }>(
+      const { token, user: userData } = await api.post<{ token: string; user: User }>(
         "/register",
-        { name: displayName, email, password, password_confirmation: password },
+        { name, email, password, password_confirmation: password },
         { anonymous: true }
       );
-      setAuthToken(result.token);
-      syncSession(result.token, normalizeUser(result.user));
-      await loadUserData();
+      setAuthToken(token);
+      setUser(userData);
       return { error: null };
     } catch (error) {
       return { error: error instanceof ApiError ? error.message : "Sign up failed" };
     }
   };
+
   const signOut = async () => {
     try {
       await api.post("/logout");
     } catch {
-      // Ignore server logout errors; clear local session regardless.
+      // Ignore server logout errors
+    } finally {
+      clearAuthToken();
+      setUser(null);
     }
-    clearAuthToken();
-    syncSession(null, null);
-    setWallet(null);
-    setRoles([]);
   };
-  const refreshWallet = async () => { if (user) await loadUserData(); };
 
+  const refreshUser = async () => {
+    if (getAuthToken()) {
+      await fetchUser();
+    }
+  };
+
+  const roles = user?.roles ?? [];
   const isSuperAdmin = roles.includes("super_admin");
   const isManager = roles.includes("manager");
   const isUploader = roles.includes("admin");
+  const isAdmin = isSuperAdmin || isManager || isUploader;
   const canManageContent = isSuperAdmin || isUploader;
   const canManageUsers = isSuperAdmin || isManager;
   const canViewAnalytics = isSuperAdmin || isManager;
-  const isAdmin = isSuperAdmin || isManager || isUploader;
 
   return (
     <Ctx.Provider value={{
-      user, session, wallet, roles,
-      isAdmin, isSuperAdmin, isManager, isUploader,
-      canManageContent, canManageUsers, canViewAnalytics,
-      loading, signIn, signUp, signOut, refreshWallet,
+      user,
+      loading,
+      isAdmin,
+      isSuperAdmin,
+      isManager,
+      isUploader,
+      canManageContent,
+      canManageUsers,
+      canViewAnalytics,
+      signIn,
+      signUp,
+      signOut,
+      refreshUser,
     }}>
       {children}
     </Ctx.Provider>
