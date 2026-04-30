@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Coins, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { verifyCoinCheckout } from "@/server/topup.functions";
+import { SparkleBurst } from "@/components/sparkle-burst";
 
 const SearchSchema = z.object({
   session_id: z.string().optional(),
@@ -37,6 +38,7 @@ function SuccessPage() {
   const [credited, setCredited] = useState<number | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [sparkle, setSparkle] = useState(false);
 
   useEffect(() => {
     if (ranRef.current) return;
@@ -63,6 +65,7 @@ function SuccessPage() {
         setBalance(res.balance ?? null);
         await refreshWallet();
         if (!res.alreadyCredited) {
+          setSparkle(true);
           toast.success(`+${res.credited} coins added!`);
         }
       } catch (e) {
@@ -74,7 +77,8 @@ function SuccessPage() {
 
   return (
     <div className="container mx-auto px-4 py-16 max-w-xl">
-      <div className="rounded-2xl border border-border bg-card p-8 text-center">
+      {sparkle && <SparkleBurst onDone={() => setSparkle(false)} />}
+      <div className="rounded-2xl glass-card p-8 text-center shadow-elev animate-scale-in">
         {status === "verifying" && (
           <>
             <Loader2 className="mx-auto h-10 w-10 text-primary animate-spin mb-4" />

@@ -140,37 +140,45 @@ function Hero({ items, loading }: { items: Series[]; loading?: boolean }) {
 
   const cur = items[idx];
   return (
-    <section className="relative w-full aspect-[21/9] min-h-[420px] max-h-[80vh] overflow-hidden bg-black">
+    <section className="relative w-full aspect-[21/9] min-h-[460px] max-h-[82vh] overflow-hidden bg-black">
       {items.map((s, i) => (
-        <div key={s.id} className={`absolute inset-0 transition-opacity duration-1000 ${i === idx ? "opacity-100" : "opacity-0"}`}>
+        <div key={s.id} className={`absolute inset-0 transition-opacity duration-[1200ms] ease-out ${i === idx ? "opacity-100" : "opacity-0"}`}>
           <img
             src={resolveImage(s.banner_url ?? s.cover_url)}
             onError={onImageError}
             alt={s.title}
-            className="h-full w-full object-cover"
+            className={`h-full w-full object-cover transition-transform duration-[6000ms] ease-out ${i === idx ? "scale-105" : "scale-100"}`}
           />
           <div className="absolute inset-0" style={{ background: "var(--gradient-hero)" }} />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
         </div>
       ))}
 
+      {/* Aurora wash */}
+      <div
+        className="pointer-events-none absolute -top-32 -left-32 h-[420px] w-[420px] rounded-full blur-3xl opacity-30 mix-blend-screen animate-ambient"
+        style={{ background: "var(--gradient-aurora)" }}
+        aria-hidden
+      />
+
       <div className="container relative mx-auto h-full flex items-center px-4 md:px-8">
-        <div className="max-w-xl space-y-4">
-          <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-primary">
-            ● Featured Series
+        <div key={cur.id} className="max-w-xl stagger">
+          <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-primary inline-flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" /> Featured Series
           </div>
-          <h1 className="text-3xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.05]">
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.05] mt-3 drop-shadow-[0_4px_24px_rgba(0,0,0,0.6)]">
             {cur.title}
           </h1>
-          <p className="text-sm md:text-base text-white/75 line-clamp-3 max-w-lg">
+          <p className="text-sm md:text-base text-white/80 line-clamp-3 max-w-lg mt-4">
             {cur.description}
           </p>
-          <div className="flex items-center gap-3 pt-2">
-            <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-[4px] h-11 px-6">
+          <div className="flex items-center gap-3 pt-5">
+            <Button asChild size="lg" className="haptic bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-11 px-6 shadow-glow">
               <Link to="/series/$slug" params={{ slug: cur.slug }}>
                 <Play className="h-4 w-4 fill-current" /> READ NOW
               </Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white font-bold rounded-[4px] h-11 px-6">
+            <Button asChild variant="outline" size="lg" className="haptic glass !bg-white/5 border-white/15 text-white hover:!bg-white/15 hover:text-white font-bold rounded-full h-11 px-6">
               <Link to="/series/$slug" params={{ slug: cur.slug }}>+ MY LIST</Link>
             </Button>
           </div>
@@ -178,10 +186,10 @@ function Hero({ items, loading }: { items: Series[]; loading?: boolean }) {
       </div>
 
       {items.length > 1 && (
-        <div className="absolute bottom-4 right-4 md:bottom-6 md:right-8 flex items-center gap-2 z-10">
-          <button onClick={() => setIdx((i) => (i - 1 + items.length) % items.length)} className="rounded-full bg-black/50 hover:bg-black/70 backdrop-blur p-2 text-white"><ChevronLeft className="h-4 w-4" /></button>
-          <span className="tabular-nums text-xs text-white/80 bg-black/50 px-2.5 py-1 rounded">{idx + 1} / {items.length}</span>
-          <button onClick={() => setIdx((i) => (i + 1) % items.length)} className="rounded-full bg-black/50 hover:bg-black/70 backdrop-blur p-2 text-white"><ChevronRight className="h-4 w-4" /></button>
+        <div className="absolute bottom-5 right-4 md:bottom-7 md:right-8 flex items-center gap-2 z-10">
+          <button onClick={() => setIdx((i) => (i - 1 + items.length) % items.length)} className="haptic rounded-full glass p-2 text-white" aria-label="Previous"><ChevronLeft className="h-4 w-4" /></button>
+          <span className="tabular-nums text-xs text-white/80 glass px-2.5 py-1 rounded-full font-bold">{String(idx + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}</span>
+          <button onClick={() => setIdx((i) => (i + 1) % items.length)} className="haptic rounded-full glass p-2 text-white" aria-label="Next"><ChevronRight className="h-4 w-4" /></button>
         </div>
       )}
     </section>
@@ -201,7 +209,7 @@ function Section({ title, items }: { title: string; items: Series[] }) {
           View All →
         </Link>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+      <div className="stagger grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
         {items.map((s) => <SeriesCard key={s.id} series={s} />)}
       </div>
     </section>

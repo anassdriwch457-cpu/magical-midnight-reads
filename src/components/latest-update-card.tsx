@@ -32,7 +32,7 @@ export function LatestUpdateCard({
   const isNew = (createdAt: string) => Date.now() - new Date(createdAt).getTime() < 1000 * 60 * 60 * 48;
 
   return (
-    <div className="flex gap-3 rounded-[6px] overflow-hidden bg-card border border-border hover:border-primary/60 transition-colors shadow-card">
+    <div className="flex gap-3 rounded-2xl overflow-hidden glass-card hover:ring-1 hover:ring-primary/40 transition-all duration-300 shadow-card hover:shadow-elev hover:-translate-y-0.5">
       <Link
         to="/series/$slug"
         params={{ slug: series.slug }}
@@ -43,11 +43,11 @@ export function LatestUpdateCard({
           onError={onImageError}
           alt={series.title}
           loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]"
         />
       </Link>
 
-      <div className="flex-1 min-w-0 py-2 pr-2 flex flex-col" style={{ background: "#1A1A1A" }}>
+      <div className="flex-1 min-w-0 py-2 pr-2 flex flex-col">
         <Link
           to="/series/$slug"
           params={{ slug: series.slug }}
@@ -77,7 +77,7 @@ export function LatestUpdateCard({
                 >
                   <span
                     className={`text-xs font-semibold tabular-nums truncate ${
-                      free ? "text-white/85 group-hover:text-white" : "text-[#F47521]"
+                      free ? "text-white/85 group-hover:text-white" : "text-primary"
                     }`}
                   >
                     Ch. {Number(c.number)}
@@ -92,11 +92,11 @@ export function LatestUpdateCard({
                         )
                       : (
                         <>
-                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#F47521]">
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary">
                             <Coins className="h-3 w-3" /> {c.price}
                           </span>
                           {fresh && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-[#F47521] text-black">
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-primary text-primary-foreground">
                               New
                             </span>
                           )}
