@@ -280,22 +280,22 @@ function Hero({ items, loading }: { items: Series[]; loading?: boolean }) {
             transition={{ duration: 0.7, ease: [0.22, 0.61, 0.36, 1] }}
             className="max-w-2xl"
           >
-            <div className="text-[11px] font-extrabold uppercase tracking-[0.32em] text-primary inline-flex items-center gap-2.5 mb-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.32em] text-primary inline-flex items-center gap-2.5 mb-4">
               <span className="relative h-1.5 w-1.5 rounded-full bg-primary">
                 <span className="absolute inset-0 rounded-full bg-primary animate-ping" />
               </span>
               Featured Series · {String(idx + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}
             </div>
-            <h1 className="font-extrabold tracking-tight text-white leading-[0.98] drop-shadow-[0_6px_30px_rgba(0,0,0,0.7)]
+            <h1 className="font-bold tracking-tight text-white leading-[0.98] drop-shadow-[0_6px_30px_rgba(0,0,0,0.7)]
                            text-4xl md:text-6xl lg:text-7xl">
-              <span className="wordmark not-italic font-extrabold">{cur.title}</span>
+              <span className="wordmark not-italic font-bold">{cur.title}</span>
             </h1>
             {cur.author && (
-              <p className="mt-3 text-xs md:text-sm font-bold uppercase tracking-[0.25em] text-white/70">
+              <p className="mt-4 text-xs md:text-sm font-medium uppercase tracking-[0.25em] text-white/65">
                 by <span className="text-white/90">{cur.author}</span>
               </p>
             )}
-            <p className="text-sm md:text-base text-white/85 line-clamp-3 max-w-xl mt-5 leading-relaxed">
+            <p className="text-sm md:text-base font-normal text-white/80 line-clamp-3 max-w-xl mt-6 leading-relaxed">
               {cur.description}
             </p>
             <div className="flex items-center gap-3 pt-7">
@@ -307,7 +307,7 @@ function Hero({ items, loading }: { items: Series[]; loading?: boolean }) {
                 </Button>
               </motion.div>
               <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }} transition={SPRING.snap}>
-                <Button asChild variant="outline" size="lg" className="focus-ring glass !bg-white/5 border-white/20 text-white hover:!bg-white/15 hover:text-white font-extrabold rounded-full h-12 px-7 text-sm tracking-wider">
+                <Button asChild variant="outline" size="lg" className="focus-ring glass !bg-white/5 border-white/15 text-white hover:!bg-white/12 hover:text-white font-semibold rounded-full h-12 px-7 text-sm tracking-wider transition-all duration-300">
                   <Link to="/series/$slug" params={{ slug: cur.slug }}>+ MY LIST</Link>
                 </Button>
               </motion.div>
