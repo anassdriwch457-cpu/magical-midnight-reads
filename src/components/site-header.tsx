@@ -120,19 +120,19 @@ export function SiteHeader() {
             transition={SPRING.snap}
           />
           <div className="leading-tight">
-            <div className={`font-extrabold tracking-tight text-white transition-all duration-500 ${scrolled ? "text-[17px]" : "text-[19px]"}`}>
+            <div className={`font-semibold tracking-tight text-white transition-all duration-300 ${scrolled ? "text-[17px]" : "text-[19px]"}`}>
               <span className="wordmark text-aurora">Nuvia</span>
               <span className="wordmark text-white/95"> Toon</span>
             </div>
-            <div className="text-[9px] uppercase tracking-[0.24em] text-white/55 font-semibold">
-              Your Next <span className="wordmark not-italic font-semibold text-primary/95">Paradise</span> in Every Page
+            <div className="text-[9px] uppercase tracking-[0.24em] text-white/50 font-medium">
+              Your Next <span className="wordmark not-italic font-medium text-primary/95">Paradise</span> in Every Page
             </div>
           </div>
         </Link>
 
         {/* NAV with magnetic underline */}
         <nav
-          className="hidden md:flex items-center gap-1 text-[12px] font-extrabold tracking-[0.18em] relative"
+          className="hidden md:flex items-center gap-1 text-[12px] font-semibold tracking-[0.16em] relative"
           onMouseLeave={() => setHoveredNav(null)}
         >
           {NAV.map((n) => {

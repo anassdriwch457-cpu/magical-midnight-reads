@@ -90,7 +90,7 @@
   --accent-foreground: oklch(0.99 0 0);
   --destructive: oklch(0.62 0.22 25);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.30 0.025 285 / 0.55);
+  --border: oklch(1 0 0 / 0.08);
   --input: oklch(0.22 0.025 282);
   --ring: oklch(0.74 0.18 50);
   --neon-purple: oklch(0.62 0.20 305);
@@ -114,10 +114,11 @@
     radial-gradient(at 78% 86%,  oklch(0.28 0.18 280 / 0.35) 0px, transparent 55%),
     radial-gradient(at 18% 92%,  oklch(0.26 0.14 200 / 0.22) 0px, transparent 60%);
 
-  --shadow-glow: 0 6px 24px oklch(0.74 0.18 50 / 0.22);
-  --shadow-glow-purple: 0 6px 28px oklch(0.62 0.20 305 / 0.30);
-  --shadow-card: 0 8px 28px oklch(0.04 0 0 / 0.55);
-  --shadow-elev: 0 24px 60px -20px oklch(0.04 0 0 / 0.7);
+  /* Softer ambient shadows — layered, low-opacity, premium feel */
+  --shadow-glow: 0 4px 20px oklch(0.74 0.18 50 / 0.16);
+  --shadow-glow-purple: 0 4px 22px oklch(0.62 0.20 305 / 0.20);
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.20), 0 8px 24px -12px oklch(0 0 0 / 0.45);
+  --shadow-elev: 0 1px 2px oklch(0 0 0 / 0.25), 0 30px 70px -28px oklch(0 0 0 / 0.65);
 
   /* Atmospheric depth tiers — apply via .depth-{0..3} */
   --depth-0: none;
@@ -204,16 +205,30 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    font-feature-settings: "ss01", "cv11", "cv05";
+    letter-spacing: -0.005em;
   }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-feature-settings: "ss01", "cv11", "cv05";
+    font-weight: 400;
     background-image: var(--gradient-mesh);
     background-attachment: fixed;
     background-size: 100% 100%;
-    /* subtle grain to kill banding on dark gradients */
     position: relative;
+  }
+  /* Premium typography defaults — Apple-style tight tracking on headings */
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.022em;
+    font-weight: 600;
+  }
+  h1 { letter-spacing: -0.03em; }
+  h2 { letter-spacing: -0.025em; }
+  /* Smooth global transitions for color/background/border */
+  a, button {
+    transition-property: color, background-color, border-color, opacity, transform, box-shadow, filter;
+    transition-duration: 300ms;
+    transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
   }
   body::before {
     content: "";

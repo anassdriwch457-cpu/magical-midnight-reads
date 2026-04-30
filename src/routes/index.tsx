@@ -80,11 +80,11 @@ function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen pb-20 relative">
+    <div className="min-h-screen pb-24 relative">
       <Hero items={trending} loading={loading} />
       <GenreBar />
 
-      <div className="container mx-auto px-4 space-y-16 mt-12 relative z-10">
+      <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10 space-y-24 md:space-y-28 mt-16 md:mt-20 relative z-10">
         {loading ? (
           <section>
             <SectionHeader title="Loading" icon={<Sparkles className="h-4 w-4" />} />
@@ -119,20 +119,20 @@ function SectionHeader({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-80px" }}
       transition={{ duration: 0.5, ease: [0.22, 0.61, 0.36, 1] }}
-      className="flex items-end justify-between mb-6"
+      className="flex items-end justify-between mb-8 md:mb-10"
     >
-      <div className="flex items-center gap-3.5">
-        <span className="block h-7 w-1 rounded-full bg-aurora animate-glow-pulse" />
+      <div className="flex items-center gap-4">
+        <span className="block h-8 w-[3px] rounded-full bg-aurora animate-glow-pulse" />
         <div>
-          {eyebrow && <div className="eyebrow mb-0.5">{eyebrow}</div>}
-          <h2 className="text-xl md:text-2xl font-extrabold tracking-tight uppercase inline-flex items-center gap-2">
+          {eyebrow && <div className="eyebrow mb-1">{eyebrow}</div>}
+          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight inline-flex items-center gap-2.5 text-foreground">
             {icon && <span className="text-primary">{icon}</span>}
             {title}
           </h2>
         </div>
       </div>
       {href && (
-        <Link to={href} className="text-xs font-extrabold uppercase tracking-[0.2em] text-muted-foreground hover:text-primary story-link">
+        <Link to={href} className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground hover:text-primary story-link transition-colors duration-300">
           View All →
         </Link>
       )}
@@ -150,7 +150,7 @@ function LatestUpdatesSection({ items }: { items: LatestEntry[] }) {
         initial="initial"
         whileInView="enter"
         viewport={{ once: true, margin: "-60px" }}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-7"
       >
         {items.map((entry) => (
           <motion.div key={entry.series.id} variants={staggerItem}>
@@ -182,7 +182,7 @@ function Section({
         initial="initial"
         whileInView="enter"
         viewport={{ once: true, margin: "-80px" }}
-        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4"
+        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 md:gap-6"
       >
         {items.map((s) => (
           <motion.div key={s.id} variants={staggerItem}>
@@ -280,22 +280,22 @@ function Hero({ items, loading }: { items: Series[]; loading?: boolean }) {
             transition={{ duration: 0.7, ease: [0.22, 0.61, 0.36, 1] }}
             className="max-w-2xl"
           >
-            <div className="text-[11px] font-extrabold uppercase tracking-[0.32em] text-primary inline-flex items-center gap-2.5 mb-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.32em] text-primary inline-flex items-center gap-2.5 mb-4">
               <span className="relative h-1.5 w-1.5 rounded-full bg-primary">
                 <span className="absolute inset-0 rounded-full bg-primary animate-ping" />
               </span>
               Featured Series · {String(idx + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}
             </div>
-            <h1 className="font-extrabold tracking-tight text-white leading-[0.98] drop-shadow-[0_6px_30px_rgba(0,0,0,0.7)]
+            <h1 className="font-bold tracking-tight text-white leading-[0.98] drop-shadow-[0_6px_30px_rgba(0,0,0,0.7)]
                            text-4xl md:text-6xl lg:text-7xl">
-              <span className="wordmark not-italic font-extrabold">{cur.title}</span>
+              <span className="wordmark not-italic font-bold">{cur.title}</span>
             </h1>
             {cur.author && (
-              <p className="mt-3 text-xs md:text-sm font-bold uppercase tracking-[0.25em] text-white/70">
+              <p className="mt-4 text-xs md:text-sm font-medium uppercase tracking-[0.25em] text-white/65">
                 by <span className="text-white/90">{cur.author}</span>
               </p>
             )}
-            <p className="text-sm md:text-base text-white/85 line-clamp-3 max-w-xl mt-5 leading-relaxed">
+            <p className="text-sm md:text-base font-normal text-white/80 line-clamp-3 max-w-xl mt-6 leading-relaxed">
               {cur.description}
             </p>
             <div className="flex items-center gap-3 pt-7">
@@ -307,7 +307,7 @@ function Hero({ items, loading }: { items: Series[]; loading?: boolean }) {
                 </Button>
               </motion.div>
               <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }} transition={SPRING.snap}>
-                <Button asChild variant="outline" size="lg" className="focus-ring glass !bg-white/5 border-white/20 text-white hover:!bg-white/15 hover:text-white font-extrabold rounded-full h-12 px-7 text-sm tracking-wider">
+                <Button asChild variant="outline" size="lg" className="focus-ring glass !bg-white/5 border-white/15 text-white hover:!bg-white/12 hover:text-white font-semibold rounded-full h-12 px-7 text-sm tracking-wider transition-all duration-300">
                   <Link to="/series/$slug" params={{ slug: cur.slug }}>+ MY LIST</Link>
                 </Button>
               </motion.div>
