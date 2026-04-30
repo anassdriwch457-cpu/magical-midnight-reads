@@ -8,6 +8,7 @@ This is a **TanStack Start v1** app (React 19 + Vite 7) with full SSR and server
 |---|---|---|
 | **Cloudflare Workers** | ✅ Default | Wired via `wrangler.jsonc` + `@cloudflare/vite-plugin`. Run `bun run build` then `wrangler deploy`. |
 | **Vercel** | ✅ Supported | Use TanStack Start's Vercel preset. See section 6. |
+| **Netlify (with Functions)** | ✅ Supported | Wired via `@netlify/vite-plugin-tanstack-start` + `netlify.toml`. See section 7. |
 | **Any Node host (VPS, Fly, Render)** | ✅ Supported | Build with the Node preset and run the server entry. |
 | **Static-only (Netlify/GitHub Pages serving `dist/`)** | ❌ Not supported | SSR + server functions + Stripe webhooks require a server runtime. |
 
