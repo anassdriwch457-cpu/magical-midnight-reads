@@ -38,6 +38,7 @@ function SuccessPage() {
   const [credited, setCredited] = useState<number | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [sparkle, setSparkle] = useState(false);
 
   useEffect(() => {
     if (ranRef.current) return;
