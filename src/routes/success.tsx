@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Coins, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { verifyCoinCheckout } from "@/server/topup.functions";
+import { SparkleBurst } from "@/components/sparkle-burst";
 
 const SearchSchema = z.object({
   session_id: z.string().optional(),
