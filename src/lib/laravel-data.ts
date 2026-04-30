@@ -95,7 +95,7 @@ async function fetchTable(state: QueryState): Promise<{ data: Row[]; count: numb
   switch (state.table) {
     case "series": {
       const qs = buildSeriesQuery(state);
-      const res = await api.get<unknown>(`/series${qs ? `?${qs}` : ""}`);
+      const res = await api.get<unknown>(`/series${qs ? `?${qs}` : ""}`, { silent: true });
       const { rows, total } = unwrapList(res);
       return { data: rows, count: total };
     }
@@ -103,14 +103,14 @@ async function fetchTable(state: QueryState): Promise<{ data: Row[]; count: numb
       const seriesId = getEq(state, "series_id");
       const inIds = state.filters.find((f) => f.kind === "in" && f.col === "series_id")?.val;
       if (seriesId) {
-        const res = await api.get<unknown>(`/series/${seriesId}/chapters`);
+        const res = await api.get<unknown>(`/series/${seriesId}/chapters`, { silent: true });
         const { rows } = unwrapList(res);
         return { data: rows, count: rows.length };
       }
       if (Array.isArray(inIds)) {
         const all = await Promise.all(
           (inIds as unknown[]).map((id) =>
-            api.get<unknown>(`/series/${id}/chapters`).catch(() => [])
+            api.get<unknown>(`/series/${id}/chapters`, { silent: true }).catch(() => [])
           ),
         );
         const flat = all.flatMap((r) => unwrapList(r).rows);
@@ -121,26 +121,26 @@ async function fetchTable(state: QueryState): Promise<{ data: Row[]; count: numb
     case "chapter_pages": {
       const chapterId = getEq(state, "chapter_id");
       if (!chapterId) return { data: [], count: 0 };
-      const res = await api.get<unknown>(`/chapters/${chapterId}/pages`);
+      const res = await api.get<unknown>(`/chapters/${chapterId}/pages`, { silent: true });
       const { rows } = unwrapList(res);
       return { data: rows, count: rows.length };
     }
     case "chapter_unlocks": {
-      const res = await api.get<unknown>(`/user/unlocks`).catch(() => []);
+      const res = await api.get<unknown>(`/user/unlocks`, { silent: true }).catch(() => []);
       const { rows } = unwrapList(res);
       return { data: rows, count: rows.length };
     }
     case "wallets": {
-      const res = await api.get<{ coins?: number }>(`/wallet/balance`).catch(() => ({ coins: 0 }));
+      const res = await api.get<{ coins?: number }>(`/wallet/balance`, { silent: true }).catch(() => ({ coins: 0 }));
       return { data: [{ coins: res?.coins ?? 0 }], count: 1 };
     }
     case "user_roles": {
-      const res = await api.get<unknown>(`/user/roles`).catch(() => []);
+      const res = await api.get<unknown>(`/user/roles`, { silent: true }).catch(() => []);
       const { rows } = unwrapList(res);
       return { data: rows, count: rows.length };
     }
     case "site_settings": {
-      const res = await api.get<Row>(`/site-settings`).catch(() => null);
+      const res = await api.get<Row>(`/site-settings`, { silent: true }).catch(() => null);
       return { data: res ? [res] : [], count: res ? 1 : 0 };
     }
     default:
