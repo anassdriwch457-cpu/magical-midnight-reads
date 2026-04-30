@@ -1,7 +1,13 @@
 # Coolify / Nixpacks build configuration
-# Forces the builder to use Bun instead of npm so `npm ci` is never invoked.
+# Forces the builder to use Bun instead of npm so `npm ci` is never invoked,
+# and produces a standalone Node-runnable server (not a Cloudflare Worker bundle).
 
 providers = ["node"]
+
+[variables]
+STANDALONE = "true"
+HOST = "0.0.0.0"
+PORT = "3000"
 
 [phases.setup]
 nixPkgs = ["nodejs_20", "bun"]
@@ -10,7 +16,7 @@ nixPkgs = ["nodejs_20", "bun"]
 cmds = ["bun install --frozen-lockfile"]
 
 [phases.build]
-cmds = ["bun run build"]
+cmds = ["bun run build:standalone"]
 
 [start]
-cmd = "bun run start"
+cmd = "node server.mjs"

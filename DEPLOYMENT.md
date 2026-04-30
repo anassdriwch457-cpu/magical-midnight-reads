@@ -131,14 +131,28 @@ After deploy, hard-refresh `/series/<slug>`, `/topup`, and any other deep link. 
 - `@tanstack/react-query` is wired through router context — DB updates show on next route load (or `router.invalidate()` for instant refresh). No rebuild needed.
 - Reader uses `loading="lazy"`, `decoding="async"`, `fetchPriority`, and CSS `content-visibility: auto`.
 
-## Coolify Deployment
+## Coolify / VPS / Standalone Docker Deployment
 
 This project uses **bun** (see `bun.lockb`). There is no `package-lock.json`, so `npm ci` will fail.
 
+For VPS / Coolify / any non-Cloudflare host the build runs in **standalone** mode:
+- `STANDALONE=true` is set during the build → the bundled Cloudflare plugin is disabled.
+- Output is a Node-runnable bundle: `dist/server/server.js` (SSR fetch handler, ESM default export) + `dist/client/` (static assets).
+- A small Node wrapper (`server.mjs`, committed at the repo root) imports that handler, serves `dist/client/*` as static files, and forwards everything else to SSR.
+- The wrapper listens on `HOST`:`PORT` (defaults `0.0.0.0:3000`) and accepts **any** `Host` header, so reverse-proxy hostnames like `*.sslip.io`, custom domains, and Coolify ingress all work without configuration.
+
 Two ready-to-use configs are included:
 
-1. **Nixpacks** (Coolify default): `nixpacks.toml` forces the builder to run `bun install --frozen-lockfile` and `bun run build`.
-2. **Dockerfile**: multi-stage build using `oven/bun:1.1`. In Coolify set Build Pack = `Dockerfile`.
+1. **Nixpacks** (Coolify default): `nixpacks.toml` sets `STANDALONE=true`, runs `bun install --frozen-lockfile` + `bun run build:standalone`, and starts with `node server.mjs`.
+2. **Dockerfile**: multi-stage build (Bun for install/build, slim Node 20 for runtime). In Coolify set Build Pack = `Dockerfile`. Exposes port `3000`.
+
+### Build & start scripts
+
+```jsonc
+"build": "vite build",                              // default (Cloudflare-compatible)
+"build:standalone": "STANDALONE=true vite build",   // Node/Bun output for VPS
+"start": "HOST=0.0.0.0 PORT=3000 node server.mjs"
+```
 
 ### Required env vars (Coolify dashboard)
 - `VITE_SUPABASE_URL`
@@ -146,5 +160,11 @@ Two ready-to-use configs are included:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - any other `VITE_*` keys used by the app
+- (optional) `PORT`, `HOST` — override the defaults above
+
+### Allowed hosts
+
+`vite.config.ts` sets `server.allowedHosts: true` and `preview.allowedHosts: true`, so `vite dev` and `vite preview` also accept arbitrary host headers. The production server (`server.mjs`) does not enforce host checks at all — Coolify's reverse proxy hostname (`*.sslip.io`, custom domains) will not be blocked.
 
 > Do **not** add `package-lock.json` — keep `bun.lockb` as the single source of truth.
+> Do **not** move or rename `server.mjs` — both `nixpacks.toml` and the `Dockerfile` reference it at the repo root.
