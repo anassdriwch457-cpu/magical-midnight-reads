@@ -130,3 +130,21 @@ After deploy, hard-refresh `/series/<slug>`, `/topup`, and any other deep link. 
 
 - `@tanstack/react-query` is wired through router context — DB updates show on next route load (or `router.invalidate()` for instant refresh). No rebuild needed.
 - Reader uses `loading="lazy"`, `decoding="async"`, `fetchPriority`, and CSS `content-visibility: auto`.
+
+## Coolify Deployment
+
+This project uses **bun** (see `bun.lockb`). There is no `package-lock.json`, so `npm ci` will fail.
+
+Two ready-to-use configs are included:
+
+1. **Nixpacks** (Coolify default): `nixpacks.toml` forces the builder to run `bun install --frozen-lockfile` and `bun run build`.
+2. **Dockerfile**: multi-stage build using `oven/bun:1.1`. In Coolify set Build Pack = `Dockerfile`.
+
+### Required env vars (Coolify dashboard)
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- any other `VITE_*` keys used by the app
+
+> Do **not** add `package-lock.json` — keep `bun.lockb` as the single source of truth.
