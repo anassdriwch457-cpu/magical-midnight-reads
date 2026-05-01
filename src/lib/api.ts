@@ -84,9 +84,31 @@ function emitError(err: ApiError | Error) {
   listeners.forEach((fn) => { try { fn(err); } catch { /* ignore */ } });
 }
 
-const axiosClient = axios.create({
+export const axiosClient = axios.create({
   timeout: 15000,
   validateStatus: () => true,
+});
+
+// Request interceptor: attach bearer token + JSON headers automatically.
+axiosClient.interceptors.request.use((config) => {
+  config.headers = config.headers ?? {};
+  if (!config.headers["Accept"]) config.headers["Accept"] = "application/json";
+  if (!config.headers["Content-Type"] && config.data && !(config.data instanceof FormData)) {
+    config.headers["Content-Type"] = "application/json";
+  }
+  if (!config.headers["Authorization"]) {
+    const token = getAuthToken();
+    if (token) config.headers["Authorization"] = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Response interceptor: clear token on 401 so the UI can redirect to /auth.
+axiosClient.interceptors.response.use((response) => {
+  if (response.status === 401 && typeof window !== "undefined") {
+    clearAuthToken();
+  }
+  return response;
 });
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
