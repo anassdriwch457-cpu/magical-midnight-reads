@@ -52,6 +52,18 @@ function AuthPage() {
           <h1 className="text-2xl font-bold text-brand">Welcome to Nuvia Toon</h1>
           <p className="text-sm text-muted-foreground mt-1">Sign in to unlock magical chapters</p>
         </div>
+        <Button
+          variant="outline"
+          className="w-full"
+          disabled={googleLoading || loading}
+          onClick={handleGoogle}
+        >
+          {googleLoading ? "Connecting…" : "Continue with Google"}
+        </Button>
+        <div className="relative my-5">
+          <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+          <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or</span></div>
+        </div>
         <Tabs defaultValue="signin">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="signin">Sign In</TabsTrigger>
