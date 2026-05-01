@@ -57,7 +57,7 @@ function RootComponent() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <ApiErrorBridge />
+        
         <SiteHeader />
         <main className="pt-0 pb-20 md:pb-0">
           <PageTransition>
