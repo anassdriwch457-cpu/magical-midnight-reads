@@ -14,9 +14,10 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -29,7 +30,18 @@ function AuthPage() {
       : await signUp(email, password, name || email.split("@")[0]);
     setLoading(false);
     if (error) toast.error(error);
-    else { toast.success(mode === "signin" ? "Welcome back!" : "Account created!"); navigate({ to: "/" }); }
+    else if (mode === "signup") toast.success("Check your email to confirm your account!");
+    else { toast.success("Welcome back!"); navigate({ to: "/" }); }
+  };
+
+  const handleGoogle = async () => {
+    setGoogleLoading(true);
+    const { error } = await signInWithGoogle();
+    if (error) {
+      toast.error(error);
+      setGoogleLoading(false);
+    }
+    // On success, browser is redirected to Google.
   };
 
   return (
