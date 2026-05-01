@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["php83", "php83Extensions.pdo_mysql", "php83Extensions.mbstring", "php83Extensions.bcmath", "php83Extensions.zip", "composer", "nginx"]
+
+[phases.install]
+cmds = ["composer install --no-dev --optimize-autoloader --no-interaction"]
+
+[start]
+cmd = "php artisan migrate --force && php -S 0.0.0.0:${PORT:-8080} -t public"
