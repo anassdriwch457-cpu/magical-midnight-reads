@@ -6,7 +6,9 @@
  */
 import axios, { AxiosError, type AxiosRequestConfig, type Method } from "axios";
 
-const RAW_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+const RAW_BASE =
+  (import.meta.env.VITE_API_URL as string | undefined)?.trim() ||
+  'http://localhost:8000/api';
 
 function normalizeApiBaseUrl(value?: string): string {
   if (!value) return "";
