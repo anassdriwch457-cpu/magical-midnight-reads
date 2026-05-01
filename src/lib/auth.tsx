@@ -62,15 +62,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadUserData = async () => {
     try {
-      const [{ coins }, rolesResponse] = await Promise.all([
-        api.get<{ coins: number }>("/wallet/balance", { silent: true }),
+      const [walletResponse, rolesResponse] = await Promise.all([
+        api.get<{ coins?: number; coin_balance?: number; balance?: number }>("/wallet/balance", { silent: true }),
         api.get<Array<{ role: Role }>>("/user/roles", { silent: true }).catch(() => []),
       ]);
-      const nextCoins = coins ?? 0;
+      // Support multiple Laravel response shapes: { coins }, { coin_balance }, { balance }.
+      const nextCoins =
+        walletResponse?.coins ??
+        walletResponse?.coin_balance ??
+        walletResponse?.balance ??
+        0;
       const nextRoles = (rolesResponse ?? []).map((x) => x.role as Role);
       setWallet({ coins: nextCoins });
       setRoles(nextRoles);
-      setUser((prev) => prev ? { ...prev, coins: nextCoins, roles: nextRoles } : prev);
+      setUser((prev) => prev ? { ...prev, coins: nextCoins, coin_balance: nextCoins, roles: nextRoles } : prev);
     } catch (err) {
       console.error("Failed to load user data", err);
       setWallet({ coins: 0 });
