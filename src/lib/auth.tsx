@@ -11,7 +11,9 @@ interface User {
   id: string;
   email?: string;
   roles?: Role[];
+  /** Coin balance — supports both `coins` (legacy) and `coin_balance` (Laravel-standard). */
   coins?: number;
+  coin_balance?: number;
   display_name?: string;
   user_metadata?: {
     display_name?: string;
