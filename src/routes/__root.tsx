@@ -1,5 +1,4 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
-import { useEffect } from "react";
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/lib/auth";
 import { ThemeProvider } from "@/lib/theme";
@@ -7,24 +6,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { MobileNav } from "@/components/mobile-nav";
 import { Toaster } from "@/components/ui/sonner";
-import { toast } from "sonner";
 import { PageTransition } from "@/components/page-transition";
-import { onApiError } from "@/lib/api";
-
-function ApiErrorBridge() {
-  useEffect(() => {
-    let last = 0;
-    return onApiError((err) => {
-      const now = Date.now();
-      if (now - last < 5000) return; // throttle
-      last = now;
-      toast.error("Service temporarily unavailable", {
-        description: "We couldn't reach the server. The app will keep rendering safely.",
-      });
-    });
-  }, []);
-  return null;
-}
 
 function NotFoundComponent() {
   return (
@@ -75,7 +57,7 @@ function RootComponent() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <ApiErrorBridge />
+        
         <SiteHeader />
         <main className="pt-0 pb-20 md:pb-0">
           <PageTransition>
