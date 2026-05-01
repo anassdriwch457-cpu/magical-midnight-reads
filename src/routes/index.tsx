@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { supabase, type Tables } from "@/lib/data-client";
+import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 import { SeriesCard } from "@/components/series-card";
 import { LatestUpdateCard } from "@/components/latest-update-card";
 import { Button } from "@/components/ui/button";

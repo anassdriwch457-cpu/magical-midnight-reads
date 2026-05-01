@@ -139,8 +139,8 @@ async function fetchTable(state: QueryState): Promise<{ data: Row[]; count: numb
       return { data: rows, count: rows.length };
     }
     case "wallets": {
-      const res = await fetchJson<{ coin_balance?: number }>(`/user`, { coin_balance: 0 });
-      return { data: [{ coins: res?.coin_balance ?? 0 }], count: 1 };
+      const res = await fetchJson<{ coins?: number }>(`/wallet/balance`, { coins: 0 });
+      return { data: [{ coins: res?.coins ?? 0 }], count: 1 };
     }
     case "user_roles": {
       const res = await fetchJson<unknown>(`/user/roles`, []);
@@ -228,13 +228,12 @@ export function makeLaravelQueryBuilder(table: string) {
   return builder;
 }
 
-export async function laravelRpc(name: string, params: Record<string, any>) {
+export async function laravelRpc(name: string, params: Record<string, unknown>) {
   if (name === "unlock_chapter") {
     const id = params._chapter_id;
     try {
       const r = await api.post<{ success: boolean; balance?: number; error?: string }>(
-        "/unlock-chapter",
-        { chapter_id: id }
+        `/chapters/${id}/unlock`,
       );
       return { data: r, error: null };
     } catch (e) {

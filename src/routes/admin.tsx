@@ -2,7 +2,9 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
-import { supabase, type Tables } from "@/lib/data-client";
+import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
+import { setUserBan } from "@/server/admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,7 +39,7 @@ export const Route = createFileRoute("/admin")({
 
 function AdminPage() {
   const auth = useAuth();
-  const { user, loading, isAdmin, isSuperAdmin, isManager, isUploader, canManageContent, canManageUsers, canViewAnalytics } = auth;
+  const { user, loading, isSuperAdmin, isManager, isUploader, canManageContent, canManageUsers, canViewAnalytics } = auth;
   const navigate = useNavigate();
 
   const allowedTabs: Tab[] = useMemo(() => {
@@ -1085,9 +1087,7 @@ function UserModal({ user, canEditRoles, onClose, onChanged }: {
   const [roles, setRoles] = useState<string[]>(user.roles);
   const [coins, setCoins] = useState(user.coins);
   const [banned, setBanned] = useState(isBanned(user));
-  const toggleBan = async () => {
-    toast.info("Ban functionality moved to Laravel backend");
-  };
+  const banFn = useServerFn(setUserBan);
 
   const adjust = async () => {
     const d = parseInt(delta);
@@ -1116,6 +1116,27 @@ function UserModal({ user, canEditRoles, onClose, onChanged }: {
     setRoles(rs => grant ? Array.from(new Set([...rs, role])) : rs.filter(r => r !== role));
     toast.success(grant ? `Granted ${role}` : `Revoked ${role}`);
     onChanged();
+  };
+
+  const toggleBan = async () => {
+    const next = !banned;
+    if (next && !confirm(`Ban ${user.email}? They will be signed out and unable to log back in.`)) return;
+    setBusy(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+      await banFn({
+        data: { targetUserId: user.id, ban: next },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      setBanned(next);
+      toast.success(next ? "User banned" : "User unbanned");
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

@@ -2,10 +2,13 @@
  * Laravel API client (Sanctum bearer-token auth).
  *
  * Configure base URL via VITE_API_URL (e.g. https://api.example.com/api).
+ * When VITE_API_URL is unset, the app runs in MOCK mode (see supabase client).
  */
 import axios, { AxiosError, type AxiosRequestConfig, type Method } from "axios";
 
-const RAW_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "";
+const RAW_BASE =
+  (import.meta.env.VITE_API_URL as string | undefined)?.trim() ||
+  'http://localhost:8000/api';
 
 function normalizeApiBaseUrl(value?: string): string {
   if (!value) return "";
@@ -81,9 +84,31 @@ function emitError(err: ApiError | Error) {
   listeners.forEach((fn) => { try { fn(err); } catch { /* ignore */ } });
 }
 
-const axiosClient = axios.create({
+export const axiosClient = axios.create({
   timeout: 15000,
   validateStatus: () => true,
+});
+
+// Request interceptor: attach bearer token + JSON headers automatically.
+axiosClient.interceptors.request.use((config) => {
+  config.headers = config.headers ?? {};
+  if (!config.headers["Accept"]) config.headers["Accept"] = "application/json";
+  if (!config.headers["Content-Type"] && config.data && !(config.data instanceof FormData)) {
+    config.headers["Content-Type"] = "application/json";
+  }
+  if (!config.headers["Authorization"]) {
+    const token = getAuthToken();
+    if (token) config.headers["Authorization"] = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Response interceptor: clear token on 401 so the UI can redirect to /auth.
+axiosClient.interceptors.response.use((response) => {
+  if (response.status === 401 && typeof window !== "undefined") {
+    clearAuthToken();
+  }
+  return response;
 });
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {

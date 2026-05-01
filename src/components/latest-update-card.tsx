@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Coins, Sparkles } from "lucide-react";
-import { type Tables } from "@/lib/data-client";
+import type { Tables } from "@/integrations/supabase/types";
 import { resolveImage, onImageError } from "@/lib/image";
 import { motion, SPRING, useReducedMotion } from "@/lib/motion";
 

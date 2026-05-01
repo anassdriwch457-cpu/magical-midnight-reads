@@ -1,5 +1,6 @@
 /**
  * Hardcoded mock data for offline / no-backend deployments.
+ * Shape mirrors the Supabase `public` schema rows used by the UI.
  */
 
 const now = new Date().toISOString();
