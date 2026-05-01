@@ -55,12 +55,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(nextUser);
   };
 
-  const normalizeUser = (payload: { id: string | number; email?: string; name?: string }): User => ({
-    id: String(payload.id),
-    email: payload.email,
-    display_name: payload.name,
-    user_metadata: { display_name: payload.name },
-  });
+  const normalizeUser = (payload: {
+    id: string | number;
+    email?: string;
+    name?: string;
+    coins?: number;
+    coin_balance?: number;
+  }): User => {
+    const balance = payload.coin_balance ?? payload.coins;
+    return {
+      id: String(payload.id),
+      email: payload.email,
+      display_name: payload.name,
+      coins: balance,
+      coin_balance: balance,
+      user_metadata: { display_name: payload.name },
+    };
+  };
 
   const loadUserData = async () => {
     try {
