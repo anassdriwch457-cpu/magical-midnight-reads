@@ -6,8 +6,8 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Coins, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { verifyCoinCheckout } from "@/server/topup.functions";
 import { SparkleBurst } from "@/components/sparkle-burst";
+import { api } from "@/lib/api";
 
 const SearchSchema = z.object({
   session_id: z.string().optional(),
@@ -29,9 +29,8 @@ type Status = "verifying" | "paid" | "pending" | "error";
 
 function SuccessPage() {
   const { session_id } = Route.useSearch();
-  const { session, refreshWallet } = useAuth();
+  const { refreshUser } = useAuth();
   const navigate = useNavigate();
-  const verify = useServerFn(verifyCoinCheckout);
   const ranRef = useRef(false);
 
   const [status, setStatus] = useState<Status>("verifying");
@@ -39,41 +38,77 @@ function SuccessPage() {
   const [balance, setBalance] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [sparkle, setSparkle] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    if (ranRef.current) return;
+    if (ranRef.current && retryCount === 0) return;
     if (!session_id) {
       setStatus("error");
       setErrorMsg("Missing session id");
       return;
     }
-    if (!session?.access_token) return; // wait for auth to hydrate
     ranRef.current = true;
 
-    (async () => {
+    const verifyPayment = async (attempt = 0) => {
       try {
-        const res = await verify({
-          data: { sessionId: session_id },
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
+        setStatus("verifying");
+        setErrorMsg(null);
+
+        // This will call your Laravel endpoint to verify the Stripe session
+        const res = await api.post<{
+          paid: boolean;
+          credited: number;
+          balance?: number;
+          alreadyCredited?: boolean;
+        }>("/verify-checkout", { sessionId: session_id });
+
         if (!res.paid) {
+          // If not paid yet, we might want to retry automatically or wait
+          if (attempt < 2) {
+            setTimeout(() => verifyPayment(attempt + 1), 3000);
+            return;
+          }
           setStatus("pending");
           return;
         }
+
         setStatus("paid");
         setCredited(res.credited);
         setBalance(res.balance ?? null);
-        await refreshWallet();
+        await refreshUser();
         if (!res.alreadyCredited) {
           setSparkle(true);
           toast.success(`+${res.credited} coins added!`);
         }
       } catch (e) {
+        console.error("Payment verification failed", e);
+        
+        // Handle specific error types
+        let message = "Verification failed. Please check your internet connection and try again.";
+        
+        if (e instanceof Error) {
+          // Check for network errors or timeouts (Axios specific if possible)
+          if (e.message.includes("timeout") || e.message.includes("Network Error")) {
+            message = "Connection timeout. Your payment might still be processing. Please refresh or try again.";
+          } else {
+            message = e.message;
+          }
+        }
+
         setStatus("error");
-        setErrorMsg(e instanceof Error ? e.message : "Verification failed");
+        setErrorMsg(message);
+        
+        // If it was a network error, maybe allow a manual retry button
+        toast.error(message);
       }
-    })();
-  }, [session_id, session?.access_token, verify, refreshWallet]);
+    };
+
+    verifyPayment();
+  }, [session_id, refreshUser, retryCount]);
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+  };
 
   return (
     <div className="container mx-auto px-4 py-16 max-w-xl">
@@ -86,6 +121,35 @@ function SuccessPage() {
             <p className="text-muted-foreground">
               Please don't close this page. We're verifying with Stripe.
             </p>
+          </>
+        )}
+
+        {status === "error" && (
+          <>
+            <XCircle className="mx-auto h-12 w-12 text-destructive mb-4" />
+            <h1 className="text-2xl font-bold mb-2">Something went wrong</h1>
+            <p className="text-destructive mb-6">{errorMsg}</p>
+            <div className="flex flex-col gap-3">
+              <Button onClick={handleRetry} variant="default">
+                Try Again
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/topup">Back to Top Up</Link>
+              </Button>
+            </div>
+          </>
+        )}
+
+        {status === "pending" && (
+          <>
+            <Loader2 className="mx-auto h-10 w-10 text-amber-500 animate-spin mb-4" />
+            <h1 className="text-2xl font-bold mb-2">Payment Pending</h1>
+            <p className="text-muted-foreground mb-6">
+              Stripe is still processing your payment. This can take a moment.
+            </p>
+            <Button onClick={handleRetry} variant="default">
+              Check Again
+            </Button>
           </>
         )}
 

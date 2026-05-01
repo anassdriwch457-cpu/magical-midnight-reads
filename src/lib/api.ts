@@ -1,11 +1,11 @@
 /**
  * Laravel API client (Sanctum bearer-token auth).
  *
- * Configure base URL via VITE_API_URL (e.g. http://31.172.87.75:8000/api).
+ * Configure base URL via VITE_API_URL (e.g. https://api.example.com/api).
  */
 import axios, { AxiosError, type AxiosRequestConfig, type Method } from "axios";
 
-const RAW_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "http://31.172.87.75:8000/api";
+const RAW_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "";
 
 function normalizeApiBaseUrl(value?: string): string {
   if (!value) return "";

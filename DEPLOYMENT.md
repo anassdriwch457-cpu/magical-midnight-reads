@@ -15,7 +15,7 @@ This is a **TanStack Start v1** app (React 19 + Vite 7) with full SSR and server
 
 ### Public — `VITE_` prefix (safe to ship to browser)
 ```
-VITE_API_URL=http://31.172.87.75:8000/api
+VITE_API_URL=https://api.your-domain.com/api
 ```
 
 ## 3. Build Scripts

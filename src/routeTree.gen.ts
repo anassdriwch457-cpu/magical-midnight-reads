@@ -18,7 +18,6 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SeriesSlugRouteImport } from './routes/series.$slug'
-import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe-webhook'
 import { Route as SeriesSlugChapterNumberRouteImport } from './routes/series.$slug.chapter.$number'
 
 const TopupRoute = TopupRouteImport.update({
@@ -66,11 +65,6 @@ const SeriesSlugRoute = SeriesSlugRouteImport.update({
   path: '/series/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicStripeWebhookRoute = ApiPublicStripeWebhookRouteImport.update({
-  id: '/api/public/stripe-webhook',
-  path: '/api/public/stripe-webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SeriesSlugChapterNumberRoute = SeriesSlugChapterNumberRouteImport.update({
   id: '/chapter/$number',
   path: '/chapter/$number',
@@ -87,7 +81,6 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/topup': typeof TopupRoute
   '/series/$slug': typeof SeriesSlugRouteWithChildren
-  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
   '/series/$slug/chapter/$number': typeof SeriesSlugChapterNumberRoute
 }
 export interface FileRoutesByTo {
@@ -100,7 +93,6 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/topup': typeof TopupRoute
   '/series/$slug': typeof SeriesSlugRouteWithChildren
-  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
   '/series/$slug/chapter/$number': typeof SeriesSlugChapterNumberRoute
 }
 export interface FileRoutesById {
@@ -114,7 +106,6 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/topup': typeof TopupRoute
   '/series/$slug': typeof SeriesSlugRouteWithChildren
-  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
   '/series/$slug/chapter/$number': typeof SeriesSlugChapterNumberRoute
 }
 export interface FileRouteTypes {
@@ -129,7 +120,6 @@ export interface FileRouteTypes {
     | '/terms'
     | '/topup'
     | '/series/$slug'
-    | '/api/public/stripe-webhook'
     | '/series/$slug/chapter/$number'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -142,7 +132,6 @@ export interface FileRouteTypes {
     | '/terms'
     | '/topup'
     | '/series/$slug'
-    | '/api/public/stripe-webhook'
     | '/series/$slug/chapter/$number'
   id:
     | '__root__'
@@ -155,7 +144,6 @@ export interface FileRouteTypes {
     | '/terms'
     | '/topup'
     | '/series/$slug'
-    | '/api/public/stripe-webhook'
     | '/series/$slug/chapter/$number'
   fileRoutesById: FileRoutesById
 }
@@ -169,7 +157,6 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   TopupRoute: typeof TopupRoute
   SeriesSlugRoute: typeof SeriesSlugRouteWithChildren
-  ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -237,13 +224,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SeriesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/stripe-webhook': {
-      id: '/api/public/stripe-webhook'
-      path: '/api/public/stripe-webhook'
-      fullPath: '/api/public/stripe-webhook'
-      preLoaderRoute: typeof ApiPublicStripeWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/series/$slug/chapter/$number': {
       id: '/series/$slug/chapter/$number'
       path: '/chapter/$number'
@@ -276,7 +256,6 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   TopupRoute: TopupRoute,
   SeriesSlugRoute: SeriesSlugRouteWithChildren,
-  ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
