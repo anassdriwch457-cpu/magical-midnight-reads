@@ -8,263 +8,252 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as TopupRouteImport } from './routes/topup'
-import { Route as TermsRouteImport } from './routes/terms'
-import { Route as SuccessRouteImport } from './routes/success'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as BrowseRouteImport } from './routes/browse'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AdminRouteImport } from './routes/admin'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as SeriesSlugRouteImport } from './routes/series.$slug'
-import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe-webhook'
-import { Route as SeriesSlugChapterNumberRouteImport } from './routes/series.$slug.chapter.$number'
+import { Route as rootRouteImport } from "./routes/__root";
+import { Route as TopupRouteImport } from "./routes/topup";
+import { Route as TermsRouteImport } from "./routes/terms";
+import { Route as SuccessRouteImport } from "./routes/success";
+import { Route as PrivacyRouteImport } from "./routes/privacy";
+import { Route as BrowseRouteImport } from "./routes/browse";
+import { Route as AuthRouteImport } from "./routes/auth";
+import { Route as AdminRouteImport } from "./routes/admin";
+import { Route as IndexRouteImport } from "./routes/index";
+import { Route as SeriesSlugRouteImport } from "./routes/series.$slug";
+import { Route as ApiPublicStripeWebhookRouteImport } from "./routes/api/public/stripe-webhook";
+import { Route as SeriesSlugChapterNumberRouteImport } from "./routes/series.$slug.chapter.$number";
 
 const TopupRoute = TopupRouteImport.update({
-  id: '/topup',
-  path: '/topup',
+  id: "/topup",
+  path: "/topup",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
+  id: "/terms",
+  path: "/terms",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SuccessRoute = SuccessRouteImport.update({
-  id: '/success',
-  path: '/success',
+  id: "/success",
+  path: "/success",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
+  id: "/privacy",
+  path: "/privacy",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const BrowseRoute = BrowseRouteImport.update({
-  id: '/browse',
-  path: '/browse',
+  id: "/browse",
+  path: "/browse",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
+  id: "/auth",
+  path: "/auth",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+  id: "/admin",
+  path: "/admin",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SeriesSlugRoute = SeriesSlugRouteImport.update({
-  id: '/series/$slug',
-  path: '/series/$slug',
+  id: "/series/$slug",
+  path: "/series/$slug",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const ApiPublicStripeWebhookRoute = ApiPublicStripeWebhookRouteImport.update({
-  id: '/api/public/stripe-webhook',
-  path: '/api/public/stripe-webhook',
+  id: "/api/public/stripe-webhook",
+  path: "/api/public/stripe-webhook",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SeriesSlugChapterNumberRoute = SeriesSlugChapterNumberRouteImport.update({
-  id: '/chapter/$number',
-  path: '/chapter/$number',
-  getParentRoute: () => SeriesSlugRoute,
-} as any)
+  id: "/series/$slug/chapter/$number",
+  path: "/series/$slug/chapter/$number",
+  getParentRoute: () => rootRouteImport,
+} as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
-  '/auth': typeof AuthRoute
-  '/browse': typeof BrowseRoute
-  '/privacy': typeof PrivacyRoute
-  '/success': typeof SuccessRoute
-  '/terms': typeof TermsRoute
-  '/topup': typeof TopupRoute
-  '/series/$slug': typeof SeriesSlugRouteWithChildren
-  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
-  '/series/$slug/chapter/$number': typeof SeriesSlugChapterNumberRoute
+  "/": typeof IndexRoute;
+  "/admin": typeof AdminRoute;
+  "/auth": typeof AuthRoute;
+  "/browse": typeof BrowseRoute;
+  "/privacy": typeof PrivacyRoute;
+  "/success": typeof SuccessRoute;
+  "/terms": typeof TermsRoute;
+  "/topup": typeof TopupRoute;
+  "/series/$slug": typeof SeriesSlugRoute;
+  "/api/public/stripe-webhook": typeof ApiPublicStripeWebhookRoute;
+  "/series/$slug/chapter/$number": typeof SeriesSlugChapterNumberRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
-  '/auth': typeof AuthRoute
-  '/browse': typeof BrowseRoute
-  '/privacy': typeof PrivacyRoute
-  '/success': typeof SuccessRoute
-  '/terms': typeof TermsRoute
-  '/topup': typeof TopupRoute
-  '/series/$slug': typeof SeriesSlugRouteWithChildren
-  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
-  '/series/$slug/chapter/$number': typeof SeriesSlugChapterNumberRoute
+  "/": typeof IndexRoute;
+  "/admin": typeof AdminRoute;
+  "/auth": typeof AuthRoute;
+  "/browse": typeof BrowseRoute;
+  "/privacy": typeof PrivacyRoute;
+  "/success": typeof SuccessRoute;
+  "/terms": typeof TermsRoute;
+  "/topup": typeof TopupRoute;
+  "/series/$slug": typeof SeriesSlugRoute;
+  "/api/public/stripe-webhook": typeof ApiPublicStripeWebhookRoute;
+  "/series/$slug/chapter/$number": typeof SeriesSlugChapterNumberRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
-  '/auth': typeof AuthRoute
-  '/browse': typeof BrowseRoute
-  '/privacy': typeof PrivacyRoute
-  '/success': typeof SuccessRoute
-  '/terms': typeof TermsRoute
-  '/topup': typeof TopupRoute
-  '/series/$slug': typeof SeriesSlugRouteWithChildren
-  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
-  '/series/$slug/chapter/$number': typeof SeriesSlugChapterNumberRoute
+  __root__: typeof rootRouteImport;
+  "/": typeof IndexRoute;
+  "/admin": typeof AdminRoute;
+  "/auth": typeof AuthRoute;
+  "/browse": typeof BrowseRoute;
+  "/privacy": typeof PrivacyRoute;
+  "/success": typeof SuccessRoute;
+  "/terms": typeof TermsRoute;
+  "/topup": typeof TopupRoute;
+  "/series/$slug": typeof SeriesSlugRoute;
+  "/api/public/stripe-webhook": typeof ApiPublicStripeWebhookRoute;
+  "/series/$slug/chapter/$number": typeof SeriesSlugChapterNumberRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
+  fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
-    | '/'
-    | '/admin'
-    | '/auth'
-    | '/browse'
-    | '/privacy'
-    | '/success'
-    | '/terms'
-    | '/topup'
-    | '/series/$slug'
-    | '/api/public/stripe-webhook'
-    | '/series/$slug/chapter/$number'
-  fileRoutesByTo: FileRoutesByTo
+    | "/"
+    | "/admin"
+    | "/auth"
+    | "/browse"
+    | "/privacy"
+    | "/success"
+    | "/terms"
+    | "/topup"
+    | "/series/$slug"
+    | "/api/public/stripe-webhook"
+    | "/series/$slug/chapter/$number";
+  fileRoutesByTo: FileRoutesByTo;
   to:
-    | '/'
-    | '/admin'
-    | '/auth'
-    | '/browse'
-    | '/privacy'
-    | '/success'
-    | '/terms'
-    | '/topup'
-    | '/series/$slug'
-    | '/api/public/stripe-webhook'
-    | '/series/$slug/chapter/$number'
+    | "/"
+    | "/admin"
+    | "/auth"
+    | "/browse"
+    | "/privacy"
+    | "/success"
+    | "/terms"
+    | "/topup"
+    | "/series/$slug"
+    | "/api/public/stripe-webhook"
+    | "/series/$slug/chapter/$number";
   id:
-    | '__root__'
-    | '/'
-    | '/admin'
-    | '/auth'
-    | '/browse'
-    | '/privacy'
-    | '/success'
-    | '/terms'
-    | '/topup'
-    | '/series/$slug'
-    | '/api/public/stripe-webhook'
-    | '/series/$slug/chapter/$number'
-  fileRoutesById: FileRoutesById
+    | "__root__"
+    | "/"
+    | "/admin"
+    | "/auth"
+    | "/browse"
+    | "/privacy"
+    | "/success"
+    | "/terms"
+    | "/topup"
+    | "/series/$slug"
+    | "/api/public/stripe-webhook"
+    | "/series/$slug/chapter/$number";
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRoute
-  AuthRoute: typeof AuthRoute
-  BrowseRoute: typeof BrowseRoute
-  PrivacyRoute: typeof PrivacyRoute
-  SuccessRoute: typeof SuccessRoute
-  TermsRoute: typeof TermsRoute
-  TopupRoute: typeof TopupRoute
-  SeriesSlugRoute: typeof SeriesSlugRouteWithChildren
-  ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
+  IndexRoute: typeof IndexRoute;
+  AdminRoute: typeof AdminRoute;
+  AuthRoute: typeof AuthRoute;
+  BrowseRoute: typeof BrowseRoute;
+  PrivacyRoute: typeof PrivacyRoute;
+  SuccessRoute: typeof SuccessRoute;
+  TermsRoute: typeof TermsRoute;
+  TopupRoute: typeof TopupRoute;
+  SeriesSlugRoute: typeof SeriesSlugRoute;
+  ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute;
+  SeriesSlugChapterNumberRoute: typeof SeriesSlugChapterNumberRoute;
 }
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    '/topup': {
-      id: '/topup'
-      path: '/topup'
-      fullPath: '/topup'
-      preLoaderRoute: typeof TopupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/success': {
-      id: '/success'
-      path: '/success'
-      fullPath: '/success'
-      preLoaderRoute: typeof SuccessRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/browse': {
-      id: '/browse'
-      path: '/browse'
-      fullPath: '/browse'
-      preLoaderRoute: typeof BrowseRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/series/$slug': {
-      id: '/series/$slug'
-      path: '/series/$slug'
-      fullPath: '/series/$slug'
-      preLoaderRoute: typeof SeriesSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/stripe-webhook': {
-      id: '/api/public/stripe-webhook'
-      path: '/api/public/stripe-webhook'
-      fullPath: '/api/public/stripe-webhook'
-      preLoaderRoute: typeof ApiPublicStripeWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/series/$slug/chapter/$number': {
-      id: '/series/$slug/chapter/$number'
-      path: '/chapter/$number'
-      fullPath: '/series/$slug/chapter/$number'
-      preLoaderRoute: typeof SeriesSlugChapterNumberRouteImport
-      parentRoute: typeof SeriesSlugRoute
-    }
+    "/topup": {
+      id: "/topup";
+      path: "/topup";
+      fullPath: "/topup";
+      preLoaderRoute: typeof TopupRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/terms": {
+      id: "/terms";
+      path: "/terms";
+      fullPath: "/terms";
+      preLoaderRoute: typeof TermsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/success": {
+      id: "/success";
+      path: "/success";
+      fullPath: "/success";
+      preLoaderRoute: typeof SuccessRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/privacy": {
+      id: "/privacy";
+      path: "/privacy";
+      fullPath: "/privacy";
+      preLoaderRoute: typeof PrivacyRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/browse": {
+      id: "/browse";
+      path: "/browse";
+      fullPath: "/browse";
+      preLoaderRoute: typeof BrowseRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/auth": {
+      id: "/auth";
+      path: "/auth";
+      fullPath: "/auth";
+      preLoaderRoute: typeof AuthRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/admin": {
+      id: "/admin";
+      path: "/admin";
+      fullPath: "/admin";
+      preLoaderRoute: typeof AdminRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/": {
+      id: "/";
+      path: "/";
+      fullPath: "/";
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/series/$slug": {
+      id: "/series/$slug";
+      path: "/series/$slug";
+      fullPath: "/series/$slug";
+      preLoaderRoute: typeof SeriesSlugRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/api/public/stripe-webhook": {
+      id: "/api/public/stripe-webhook";
+      path: "/api/public/stripe-webhook";
+      fullPath: "/api/public/stripe-webhook";
+      preLoaderRoute: typeof ApiPublicStripeWebhookRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/series/$slug/chapter/$number": {
+      id: "/series/$slug/chapter/$number";
+      path: "/series/$slug/chapter/$number";
+      fullPath: "/series/$slug/chapter/$number";
+      preLoaderRoute: typeof SeriesSlugChapterNumberRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
-
-interface SeriesSlugRouteChildren {
-  SeriesSlugChapterNumberRoute: typeof SeriesSlugChapterNumberRoute
-}
-
-const SeriesSlugRouteChildren: SeriesSlugRouteChildren = {
-  SeriesSlugChapterNumberRoute: SeriesSlugChapterNumberRoute,
-}
-
-const SeriesSlugRouteWithChildren = SeriesSlugRoute._addFileChildren(
-  SeriesSlugRouteChildren,
-)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -275,18 +264,17 @@ const rootRouteChildren: RootRouteChildren = {
   SuccessRoute: SuccessRoute,
   TermsRoute: TermsRoute,
   TopupRoute: TopupRoute,
-  SeriesSlugRoute: SeriesSlugRouteWithChildren,
+  SeriesSlugRoute: SeriesSlugRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
-}
-export const routeTree = rootRouteImport
-  ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  SeriesSlugChapterNumberRoute: SeriesSlugChapterNumberRoute,
+};
+export const routeTree = rootRouteImport._addFileChildren(rootRouteChildren)._addFileTypes<FileRouteTypes>();
 
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
+import type { getRouter } from "./router.tsx";
+import type { createStart } from "@tanstack/react-start";
+declare module "@tanstack/react-start" {
   interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
+    ssr: true;
+    router: Awaited<ReturnType<typeof getRouter>>;
   }
 }
