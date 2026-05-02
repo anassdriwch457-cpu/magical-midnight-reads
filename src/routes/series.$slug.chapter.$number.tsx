@@ -21,13 +21,14 @@ import { toast } from "sonner";
 import { QuickSwitchDrawer } from "@/components/quick-switch-drawer";
 import { SparkleBurst } from "@/components/sparkle-burst";
 import { motion, SPRING, SpringNumber } from "@/lib/motion";
+import { resolveImage, PLACEHOLDER_COVER } from "@/lib/image";
 
 type Chapter = Tables<"chapters">;
 type Page = Tables<"chapter_pages">;
 type Series = Tables<"series">;
 
 function normalizePages(rows: Page[]): Page[] {
-  return rows.map((p) => ({ ...p, image_url: resolveImageUrl(p.image_url) }));
+  return rows.map((p) => ({ ...p, image_url: resolveImage(p.image_url) }));
 }
 
 export const Route = createFileRoute("/series/$slug/chapter/$number")({
@@ -625,14 +626,16 @@ function ReaderPage() {
                   decoding="async"
                   fetchPriority={i < 2 ? "high" : "low"}
                   draggable={false}
-                  crossOrigin="anonymous"
                   onLoad={(e) => {
                     if (i < 4) samplePage(e.currentTarget, p.id);
                   }}
-                  onError={() => {
-                    // eslint-disable-next-line no-console
-                    console.warn("[Reader] Image failed:", p.image_url);
-                    setFailedImages((prev) => new Set(prev).add(p.id));
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    if (img.src !== PLACEHOLDER_COVER) {
+                      img.src = PLACEHOLDER_COVER;
+                    } else {
+                      setFailedImages((prev) => new Set(prev).add(p.id));
+                    }
                   }}
                   initial={{ opacity: 0, y: 8 }}
                   whileInView={{ opacity: 1, y: 0 }}
