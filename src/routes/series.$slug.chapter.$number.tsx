@@ -100,13 +100,20 @@ function ReaderPage() {
         const { data: pageRows, error: pagesError } = await supabase
           .from("chapter_pages").select("*").eq("chapter_id", currentChapter.id).order("page_number", { ascending: true });
         if (pagesError) throw pagesError;
-        const loadedPages = pageRows ?? [];
+        const loadedPages = normalizePages(pageRows ?? []);
+        // eslint-disable-next-line no-console
+        console.log("[Reader] Chapter data:", { series: s, chapter: currentChapter, pages: loadedPages });
         setPages(loadedPages);
         setPagesLoading(false);
         if (loadedPages.length === 0) {
-          setDebugMessage(`Debug: Chapter ID ${currentChapter.id} reached. No images were returned from your Laravel API.`);
+          setDebugMessage(`Debug: Chapter ID ${currentChapter.id} reached. No pages were returned from the database.`);
         }
         return;
+      }
+      // Novel — log the content for debugging
+      if (s.type !== "manga") {
+        // eslint-disable-next-line no-console
+        console.log("[Reader] Novel chapter:", { series: s, chapter: currentChapter, contentLength: currentChapter.content?.length ?? 0 });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown reader error";
