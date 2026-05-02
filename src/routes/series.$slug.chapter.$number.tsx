@@ -447,7 +447,7 @@ function ReaderPage() {
     navigate({ to: "/series/$slug/chapter/$number", params: { slug, number: String(n) } });
 
   return (
-    <div ref={scrollerRef} className="fixed inset-0 bg-black overflow-y-auto z-30 [scroll-behavior:smooth]">
+    <div key={`${slug}-${number}`} ref={scrollerRef} className="fixed inset-0 bg-black overflow-y-auto z-30 [scroll-behavior:smooth]">
       {/* Ambient light backdrop reflecting current page color */}
       <div
         className="pointer-events-none fixed inset-0 -z-0 opacity-50 transition-[background] duration-700 ease-out"
