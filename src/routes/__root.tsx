@@ -1,4 +1,4 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet, Link, createRootRoute, HeadContent, Scripts, useLocation } from "@tanstack/react-router";
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/lib/auth";
 import { ThemeProvider } from "@/lib/theme";
@@ -16,7 +16,12 @@ function NotFoundComponent() {
         <h2 className="mt-4 text-xl font-semibold">Page not found</h2>
         <p className="mt-2 text-sm text-muted-foreground">The page you're looking for doesn't exist.</p>
         <div className="mt-6">
-          <Link to="/" className="inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-medium text-primary-foreground">Go home</Link>
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            Go home
+          </Link>
         </div>
       </div>
     </div>
@@ -29,14 +34,34 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Nuvia Toon — Read Magical Manhwa & Novels" },
-      { name: "description", content: "Discover trending manhwa and novels with a magical reading experience. Unlock premium chapters with coins." },
+      {
+        name: "description",
+        content:
+          "Discover trending manhwa and novels with a magical reading experience. Unlock premium chapters with coins.",
+      },
       { property: "og:title", content: "Nuvia Toon — Read Magical Manhwa & Novels" },
-      { property: "og:description", content: "Discover trending manhwa and novels with a magical reading experience. Unlock premium chapters with coins." },
+      {
+        property: "og:description",
+        content:
+          "Discover trending manhwa and novels with a magical reading experience. Unlock premium chapters with coins.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:title", content: "Nuvia Toon — Read Magical Manhwa & Novels" },
-      { name: "twitter:description", content: "Discover trending manhwa and novels with a magical reading experience. Unlock premium chapters with coins." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7974b71b-459b-4dc0-a570-816398753b1a/id-preview-11016cb7--c3549c37-0486-480d-915f-00213b732564.lovable.app-1777596935154.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7974b71b-459b-4dc0-a570-816398753b1a/id-preview-11016cb7--c3549c37-0486-480d-915f-00213b732564.lovable.app-1777596935154.png" },
+      {
+        name: "twitter:description",
+        content:
+          "Discover trending manhwa and novels with a magical reading experience. Unlock premium chapters with coins.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7974b71b-459b-4dc0-a570-816398753b1a/id-preview-11016cb7--c3549c37-0486-480d-915f-00213b732564.lovable.app-1777596935154.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7974b71b-459b-4dc0-a570-816398753b1a/id-preview-11016cb7--c3549c37-0486-480d-915f-00213b732564.lovable.app-1777596935154.png",
+      },
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
@@ -49,7 +74,9 @@ export const Route = createRootRoute({
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="theme-magic">
-      <head><HeadContent /></head>
+      <head>
+        <HeadContent />
+      </head>
       <body>
         {children}
         <Scripts />
@@ -59,18 +86,24 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const location = useLocation();
+  const isReader = /\/series\/[^/]+\/chapter\//.test(location.pathname);
+
   return (
     <ThemeProvider>
       <AuthProvider>
-        
-        <SiteHeader />
-        <main className="pt-0 pb-20 md:pb-0">
-          <PageTransition>
+        {!isReader && <SiteHeader />}
+        <main className={isReader ? "" : "pt-0 pb-20 md:pb-0"}>
+          {isReader ? (
             <Outlet />
-          </PageTransition>
+          ) : (
+            <PageTransition>
+              <Outlet />
+            </PageTransition>
+          )}
         </main>
-        <SiteFooter />
-        <MobileNav />
+        {!isReader && <SiteFooter />}
+        {!isReader && <MobileNav />}
         <Toaster richColors position="top-center" />
       </AuthProvider>
     </ThemeProvider>
