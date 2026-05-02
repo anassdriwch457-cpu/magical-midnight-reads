@@ -154,6 +154,15 @@ function ReaderPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [slug, number, user?.id]);
 
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    scroller.scrollTo({ top: 0, behavior: "auto" });
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+  }, [slug, number]);
+
   // Auto-hide UI
   useEffect(() => {
     if (!unlocked) return;
