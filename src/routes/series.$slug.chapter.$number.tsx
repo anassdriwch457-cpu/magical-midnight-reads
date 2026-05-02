@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Coins, Lock, Maximize2, Minimize2, ListOrdered } from "lucide-react";
+import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Coins, Lock, Maximize2, Minimize2, ListOrdered, RefreshCw, Type } from "lucide-react";
 import { toast } from "sonner";
 import { QuickSwitchDrawer } from "@/components/quick-switch-drawer";
 import { SparkleBurst } from "@/components/sparkle-burst";
@@ -13,6 +13,23 @@ import { motion, SPRING, SpringNumber } from "@/lib/motion";
 type Chapter = Tables<"chapters">;
 type Page = Tables<"chapter_pages">;
 type Series = Tables<"series">;
+
+// Normalize page image URLs: support absolute URLs and relative storage paths.
+function resolveImageUrl(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const url = String(raw).trim();
+  if (!url) return "";
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  // Relative path → resolve against current origin (Lovable Cloud storage URLs are absolute already)
+  if (typeof window !== "undefined") {
+    return url.startsWith("/") ? `${window.location.origin}${url}` : `${window.location.origin}/${url}`;
+  }
+  return url;
+}
+
+function normalizePages(rows: Page[]): Page[] {
+  return rows.map((p) => ({ ...p, image_url: resolveImageUrl(p.image_url) }));
+}
 
 export const Route = createFileRoute("/series/$slug/chapter/$number")({
   component: ReaderPage,
