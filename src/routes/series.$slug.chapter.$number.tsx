@@ -4,7 +4,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Coins, Lock, Maximize2, Minimize2, ListOrdered, RefreshCw, Type } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Coins,
+  Lock,
+  Maximize2,
+  Minimize2,
+  ListOrdered,
+  RefreshCw,
+  Type,
+} from "lucide-react";
 import { toast } from "sonner";
 import { QuickSwitchDrawer } from "@/components/quick-switch-drawer";
 import { SparkleBurst } from "@/components/sparkle-burst";
@@ -13,19 +25,6 @@ import { motion, SPRING, SpringNumber } from "@/lib/motion";
 type Chapter = Tables<"chapters">;
 type Page = Tables<"chapter_pages">;
 type Series = Tables<"series">;
-
-// Normalize page image URLs: support absolute URLs and relative storage paths.
-function resolveImageUrl(raw: string | null | undefined): string {
-  if (!raw) return "";
-  const url = String(raw).trim();
-  if (!url) return "";
-  if (/^(https?:|data:|blob:)/i.test(url)) return url;
-  // Relative path → resolve against current origin (Lovable Cloud storage URLs are absolute already)
-  if (typeof window !== "undefined") {
-    return url.startsWith("/") ? `${window.location.origin}${url}` : `${window.location.origin}/${url}`;
-  }
-  return url;
-}
 
 function normalizePages(rows: Page[]): Page[] {
   return rows.map((p) => ({ ...p, image_url: resolveImageUrl(p.image_url) }));
@@ -80,18 +79,21 @@ function ReaderPage() {
     setPagesLoading(false);
 
     try {
-      const { data: s, error: seriesError } = await supabase
-        .from("series").select("*").eq("slug", slug).maybeSingle();
+      const { data: s, error: seriesError } = await supabase.from("series").select("*").eq("slug", slug).maybeSingle();
       if (seriesError) throw seriesError;
       if (!s) {
-        setSeries(null); setChapter(null);
+        setSeries(null);
+        setChapter(null);
         setDebugMessage(`Debug: Series slug "${slug}" was reached, but no series was found.`);
         return;
       }
       setSeries(s);
 
       const { data: chapterRows, error: chaptersError } = await supabase
-        .from("chapters").select("*").eq("series_id", s.id).order("number", { ascending: true });
+        .from("chapters")
+        .select("*")
+        .eq("series_id", s.id)
+        .order("number", { ascending: true });
       if (chaptersError) throw chaptersError;
 
       const allRows = chapterRows ?? [];
@@ -100,7 +102,9 @@ function ReaderPage() {
       const nums = allRows.map((item) => Number(item.number));
       const currentChapter = allRows.find((item) => Number(item.number) === Number(number)) ?? null;
       if (!currentChapter) {
-        setChapter(null); setSiblings({}); setUnlocked(false);
+        setChapter(null);
+        setSiblings({});
+        setUnlocked(false);
         setDebugMessage(`Debug: Series "${s.title}" loaded, but chapter number ${number} was not found.`);
         return;
       }
@@ -125,7 +129,10 @@ function ReaderPage() {
         setLoading(false);
         setPagesLoading(true);
         const { data: pageRows, error: pagesError } = await supabase
-          .from("chapter_pages").select("*").eq("chapter_id", currentChapter.id).order("page_number", { ascending: true });
+          .from("chapter_pages")
+          .select("*")
+          .eq("chapter_id", currentChapter.id)
+          .order("page_number", { ascending: true });
         if (pagesError) throw pagesError;
         const loadedPages = normalizePages(pageRows ?? []);
         // eslint-disable-next-line no-console
@@ -140,7 +147,11 @@ function ReaderPage() {
       // Novel — log the content for debugging
       if (s.type !== "manga") {
         // eslint-disable-next-line no-console
-        console.log("[Reader] Novel chapter:", { series: s, chapter: currentChapter, contentLength: currentChapter.content?.length ?? 0 });
+        console.log("[Reader] Novel chapter:", {
+          series: s,
+          chapter: currentChapter,
+          contentLength: currentChapter.content?.length ?? 0,
+        });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown reader error";
@@ -152,7 +163,9 @@ function ReaderPage() {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [slug, number, user?.id]);
+  useEffect(() => {
+    load(); /* eslint-disable-next-line */
+  }, [slug, number, user?.id]);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -199,7 +212,10 @@ function ReaderPage() {
     };
     onScroll();
     el.addEventListener("scroll", onScroll, { passive: true });
-    return () => { cancelAnimationFrame(raf); el.removeEventListener("scroll", onScroll); };
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener("scroll", onScroll);
+    };
   }, [unlocked, pages.length]);
 
   // Ambient light: sample dominant color from page imgs as they enter the viewport
@@ -214,17 +230,25 @@ function ReaderPage() {
       if (!ctx) return;
       ctx.drawImage(img, 0, 0, w, h);
       const data = ctx.getImageData(0, 0, w, h).data;
-      let r = 0, g = 0, b = 0, n = 0;
+      let r = 0,
+        g = 0,
+        b = 0,
+        n = 0;
       for (let i = 0; i < data.length; i += 4) {
         const a = data[i + 3];
         if (a < 128) continue;
         // Skip near-black/white to capture meaningful color
         const br = (data[i] + data[i + 1] + data[i + 2]) / 3;
         if (br < 30 || br > 240) continue;
-        r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
+        r += data[i];
+        g += data[i + 1];
+        b += data[i + 2];
+        n++;
       }
       if (n < 20) return;
-      r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
+      r = Math.round(r / n);
+      g = Math.round(g / n);
+      b = Math.round(b / n);
       setAmbient(`rgb(${r}, ${g}, ${b})`);
     } catch {
       // Cross-origin canvas tainting — skip silently
@@ -232,16 +256,24 @@ function ReaderPage() {
   };
 
   const handleUnlock = async () => {
-    if (!user) { navigate({ to: "/auth" }); return; }
+    if (!user) {
+      navigate({ to: "/auth" });
+      return;
+    }
     if (!chapter) return;
     setUnlocking(true);
     const { data, error } = await supabase.rpc("unlock_chapter", { _chapter_id: chapter.id });
     setUnlocking(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     const r = data as { success: boolean; error?: string; balance?: number };
     if (!r.success) {
-      if (r.error === "Insufficient coins") { toast.error("Not enough coins. Top up to continue."); navigate({ to: "/topup" }); }
-      else toast.error(r.error ?? "Failed to unlock");
+      if (r.error === "Insufficient coins") {
+        toast.error("Not enough coins. Top up to continue.");
+        navigate({ to: "/topup" });
+      } else toast.error(r.error ?? "Failed to unlock");
       return;
     }
     setSparkle(true);
@@ -258,14 +290,20 @@ function ReaderPage() {
 
   const drawerChapters = useMemo(
     () => allChapters.map((c) => ({ id: c.id, number: c.number, title: c.title, price: c.price })),
-    [allChapters]
+    [allChapters],
   );
 
   const renderTopBar = () => (
-    <div className={`fixed top-0 inset-x-0 z-40 transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+    <div
+      className={`fixed top-0 inset-x-0 z-40 transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+    >
       <div className="glass-strong">
         <div className="container mx-auto px-4 h-14 flex items-center justify-between gap-3">
-          <Link to="/series/$slug" params={{ slug }} className="haptic flex items-center gap-2 text-sm text-white/90 hover:text-primary min-w-0">
+          <Link
+            to="/series/$slug"
+            params={{ slug }}
+            className="haptic flex items-center gap-2 text-sm text-white/90 hover:text-primary min-w-0"
+          >
             <ArrowLeft className="h-4 w-4 shrink-0" />
             <span className="font-bold truncate max-w-[40vw]">{series?.title ?? "Back to Series"}</span>
           </Link>
@@ -299,12 +337,16 @@ function ReaderPage() {
     <div className="fixed top-0 inset-x-0 z-50 h-0.5 bg-white/5 pointer-events-none">
       <div
         className="h-full transition-[width] duration-150 ease-out"
-        style={{ width: `${progress}%`, background: "var(--gradient-aurora)", boxShadow: "0 0 12px var(--neon-purple)" }}
+        style={{
+          width: `${progress}%`,
+          background: "var(--gradient-aurora)",
+          boxShadow: "0 0 12px var(--neon-purple)",
+        }}
       />
     </div>
   );
 
-  const renderCinemaExit = () => (
+  const renderCinemaExit = () =>
     cinematic && (
       <button
         onClick={() => setCinematic(false)}
@@ -313,12 +355,13 @@ function ReaderPage() {
       >
         <Minimize2 className="h-4 w-4" />
       </button>
-    )
-  );
+    );
 
   const renderBottomBar = () => (
-    <div className={`fixed bottom-0 inset-x-0 z-40 glass-strong transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+    <div
+      className={`fixed bottom-0 inset-x-0 z-40 glass-strong transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       <div className="container mx-auto px-3 h-16 flex items-center justify-between gap-2">
         {siblings.prev !== undefined ? (
           <Button asChild variant="ghost" className="haptic text-white hover:bg-white/10 rounded-full">
@@ -326,7 +369,9 @@ function ReaderPage() {
               <ChevronLeft className="h-4 w-4" /> <span className="hidden sm:inline">PREV</span>
             </Link>
           </Button>
-        ) : <div className="w-16" />}
+        ) : (
+          <div className="w-16" />
+        )}
 
         <button
           onClick={() => setDrawerOpen(true)}
@@ -337,12 +382,17 @@ function ReaderPage() {
         </button>
 
         {siblings.next !== undefined ? (
-          <Button asChild className="haptic bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full px-5 shadow-glow">
+          <Button
+            asChild
+            className="haptic bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full px-5 shadow-glow"
+          >
             <Link to="/series/$slug/chapter/$number" params={{ slug, number: String(siblings.next) }}>
               <span className="hidden sm:inline">NEXT</span> <ChevronRight className="h-4 w-4" />
             </Link>
           </Button>
-        ) : <div className="w-16" />}
+        ) : (
+          <div className="w-16" />
+        )}
       </div>
     </div>
   );
@@ -371,7 +421,9 @@ function ReaderPage() {
               <AlertCircle className="h-5 w-5 mt-0.5" />
               <div className="space-y-2">
                 <h1 className="text-lg font-bold text-foreground">Reader loaded, but this chapter is missing</h1>
-                <p className="text-sm text-muted-foreground">{debugMessage ?? "Debug: The chapter route loaded but the requested chapter record was not found."}</p>
+                <p className="text-sm text-muted-foreground">
+                  {debugMessage ?? "Debug: The chapter route loaded but the requested chapter record was not found."}
+                </p>
                 {errorMessage && <p className="text-xs text-destructive">{errorMessage}</p>}
               </div>
             </div>
@@ -387,8 +439,11 @@ function ReaderPage() {
         {renderTopBar()}
         <div className="min-h-screen flex items-center justify-center px-4 pt-20 pb-24">
           {/* Aurora ambient backdrop */}
-          <div className="pointer-events-none absolute inset-0 opacity-30 mix-blend-screen blur-3xl animate-ambient"
-               style={{ background: "var(--gradient-aurora)" }} aria-hidden />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-30 mix-blend-screen blur-3xl animate-ambient"
+            style={{ background: "var(--gradient-aurora)" }}
+            aria-hidden
+          />
           <motion.div
             initial={{ opacity: 0, y: 16, scale: 0.96, filter: "blur(8px)" }}
             animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
@@ -414,18 +469,21 @@ function ReaderPage() {
             {user && (
               <p className="text-sm text-muted-foreground mb-4">
                 Your balance:{" "}
-                <SpringNumber
-                  value={wallet?.coins ?? 0}
-                  className="font-semibold text-foreground tabular-nums"
-                />
+                <SpringNumber value={wallet?.coins ?? 0} className="font-semibold text-foreground tabular-nums" />
               </p>
             )}
             <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={SPRING.snap}>
-              <Button onClick={handleUnlock} disabled={unlocking} className="focus-ring w-full bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-11 shadow-glow">
+              <Button
+                onClick={handleUnlock}
+                disabled={unlocking}
+                className="focus-ring w-full bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-11 shadow-glow"
+              >
                 {unlocking ? "UNLOCKING…" : user ? "UNLOCK CHAPTER" : "SIGN IN TO UNLOCK"}
               </Button>
             </motion.div>
-            <Button asChild variant="ghost" className="w-full mt-2 text-white/80 hover:text-white"><Link to="/topup">Need more coins? Top up →</Link></Button>
+            <Button asChild variant="ghost" className="w-full mt-2 text-white/80 hover:text-white">
+              <Link to="/topup">Need more coins? Top up →</Link>
+            </Button>
           </motion.div>
         </div>
         {renderBottomBar()}
@@ -447,7 +505,11 @@ function ReaderPage() {
     navigate({ to: "/series/$slug/chapter/$number", params: { slug, number: String(n) } });
 
   return (
-    <div key={`${slug}-${number}`} ref={scrollerRef} className="fixed inset-0 bg-black overflow-y-auto z-30 [scroll-behavior:smooth]">
+    <div
+      key={`${slug}-${number}`}
+      ref={scrollerRef}
+      className="fixed inset-0 bg-black overflow-y-auto z-30 [scroll-behavior:smooth]"
+    >
       {/* Ambient light backdrop reflecting current page color */}
       <div
         className="pointer-events-none fixed inset-0 -z-0 opacity-50 transition-[background] duration-700 ease-out"
@@ -492,7 +554,9 @@ function ReaderPage() {
       {renderProgressBar()}
       {renderTopBar()}
       {renderCinemaExit()}
-      <div className={`relative z-10 ${series.type === "manga" ? "max-w-3xl mx-auto" : "max-w-2xl mx-auto px-4"} ${cinematic ? "pt-2 pb-2" : "pt-20 pb-24"}`}>
+      <div
+        className={`relative z-10 ${series.type === "manga" ? "max-w-3xl mx-auto" : "max-w-2xl mx-auto px-4"} ${cinematic ? "pt-2 pb-2" : "pt-20 pb-24"}`}
+      >
         {series.type === "manga" ? (
           pagesLoading ? (
             <div className="flex items-center justify-center py-20">
@@ -508,9 +572,16 @@ function ReaderPage() {
                   <AlertCircle className="h-5 w-5 mt-0.5" />
                   <div className="space-y-3">
                     <h2 className="text-lg font-bold text-foreground">No reader pages found</h2>
-                    <p className="text-sm text-muted-foreground">{debugMessage ?? `Debug: Chapter ID ${chapter.id} reached. No pages were returned from the database.`}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {debugMessage ??
+                        `Debug: Chapter ID ${chapter.id} reached. No pages were returned from the database.`}
+                    </p>
                     {errorMessage && <p className="text-xs text-destructive">{errorMessage}</p>}
-                    <Button onClick={() => load()} size="sm" className="bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full">
+                    <Button
+                      onClick={() => load()}
+                      size="sm"
+                      className="bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full"
+                    >
                       <RefreshCw className="h-4 w-4 mr-1.5" /> Retry
                     </Button>
                   </div>
@@ -520,16 +591,24 @@ function ReaderPage() {
           ) : (
             pages.map((p, i) => {
               const retryKey = imageRetry[p.id] ?? 0;
-              const src = retryKey > 0 ? `${p.image_url}${p.image_url.includes("?") ? "&" : "?"}r=${retryKey}` : p.image_url;
+              const src =
+                retryKey > 0 ? `${p.image_url}${p.image_url.includes("?") ? "&" : "?"}r=${retryKey}` : p.image_url;
               const failed = failedImages.has(p.id);
               return failed ? (
-                <div key={p.id} className="w-full bg-white/5 border border-white/10 py-10 my-2 flex flex-col items-center justify-center gap-3 text-white/80">
+                <div
+                  key={p.id}
+                  className="w-full bg-white/5 border border-white/10 py-10 my-2 flex flex-col items-center justify-center gap-3 text-white/80"
+                >
                   <AlertCircle className="h-6 w-6 text-destructive" />
                   <p className="text-sm">Page {p.page_number} failed to load</p>
                   <Button
                     size="sm"
                     onClick={() => {
-                      setFailedImages((prev) => { const n = new Set(prev); n.delete(p.id); return n; });
+                      setFailedImages((prev) => {
+                        const n = new Set(prev);
+                        n.delete(p.id);
+                        return n;
+                      });
                       setImageRetry((prev) => ({ ...prev, [p.id]: (prev[p.id] ?? 0) + 1 }));
                     }}
                     className="bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full"
@@ -547,7 +626,9 @@ function ReaderPage() {
                   fetchPriority={i < 2 ? "high" : "low"}
                   draggable={false}
                   crossOrigin="anonymous"
-                  onLoad={(e) => { if (i < 4) samplePage(e.currentTarget, p.id); }}
+                  onLoad={(e) => {
+                    if (i < 4) samplePage(e.currentTarget, p.id);
+                  }}
                   onError={() => {
                     // eslint-disable-next-line no-console
                     console.warn("[Reader] Image failed:", p.image_url);
@@ -598,8 +679,14 @@ function ReaderPage() {
                   <AlertCircle className="h-5 w-5 mt-0.5" />
                   <div className="space-y-3">
                     <h2 className="text-lg font-bold text-foreground">No chapter text found</h2>
-                    <p className="text-sm text-muted-foreground">Debug: Chapter ID {chapter.id} loaded, but no <code>content</code> was returned.</p>
-                    <Button onClick={() => load()} size="sm" className="bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full">
+                    <p className="text-sm text-muted-foreground">
+                      Debug: Chapter ID {chapter.id} loaded, but no <code>content</code> was returned.
+                    </p>
+                    <Button
+                      onClick={() => load()}
+                      size="sm"
+                      className="bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full"
+                    >
                       <RefreshCw className="h-4 w-4 mr-1.5" /> Retry
                     </Button>
                   </div>
@@ -612,7 +699,11 @@ function ReaderPage() {
         {/* End-of-chapter CTA */}
         {unlocked && pages.length > 0 && siblings.next !== undefined && (
           <div className="mt-10 mb-4 flex justify-center">
-            <Button asChild size="lg" className="haptic bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-12 px-8 shadow-glow">
+            <Button
+              asChild
+              size="lg"
+              className="haptic bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-12 px-8 shadow-glow"
+            >
               <Link to="/series/$slug/chapter/$number" params={{ slug, number: String(siblings.next) }}>
                 NEXT CHAPTER <ChevronRight className="h-4 w-4" />
               </Link>
