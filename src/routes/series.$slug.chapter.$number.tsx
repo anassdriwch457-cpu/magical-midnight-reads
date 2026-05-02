@@ -58,6 +58,16 @@ function ReaderPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sparkle, setSparkle] = useState(false);
   const [ambient, setAmbient] = useState<string>("oklch(0.62 0.20 305)");
+  const [imageRetry, setImageRetry] = useState<Record<string, number>>({});
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [novelFontSize, setNovelFontSize] = useState<number>(() => {
+    if (typeof window === "undefined") return 17;
+    const saved = Number(window.localStorage.getItem("nuvia.novelFontSize"));
+    return Number.isFinite(saved) && saved >= 12 && saved <= 28 ? saved : 17;
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") window.localStorage.setItem("nuvia.novelFontSize", String(novelFontSize));
+  }, [novelFontSize]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sampledRef = useRef<Set<string>>(new Set());
