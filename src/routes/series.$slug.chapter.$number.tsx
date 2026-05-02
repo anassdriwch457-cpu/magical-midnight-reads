@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Coins, Lock, Maximize2, Minimize2, ListOrdered } from "lucide-react";
+import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Coins, Lock, Maximize2, Minimize2, ListOrdered, RefreshCw, Type } from "lucide-react";
 import { toast } from "sonner";
 import { QuickSwitchDrawer } from "@/components/quick-switch-drawer";
 import { SparkleBurst } from "@/components/sparkle-burst";
@@ -13,6 +13,23 @@ import { motion, SPRING, SpringNumber } from "@/lib/motion";
 type Chapter = Tables<"chapters">;
 type Page = Tables<"chapter_pages">;
 type Series = Tables<"series">;
+
+// Normalize page image URLs: support absolute URLs and relative storage paths.
+function resolveImageUrl(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const url = String(raw).trim();
+  if (!url) return "";
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  // Relative path → resolve against current origin (Lovable Cloud storage URLs are absolute already)
+  if (typeof window !== "undefined") {
+    return url.startsWith("/") ? `${window.location.origin}${url}` : `${window.location.origin}/${url}`;
+  }
+  return url;
+}
+
+function normalizePages(rows: Page[]): Page[] {
+  return rows.map((p) => ({ ...p, image_url: resolveImageUrl(p.image_url) }));
+}
 
 export const Route = createFileRoute("/series/$slug/chapter/$number")({
   component: ReaderPage,
@@ -41,6 +58,16 @@ function ReaderPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sparkle, setSparkle] = useState(false);
   const [ambient, setAmbient] = useState<string>("oklch(0.62 0.20 305)");
+  const [imageRetry, setImageRetry] = useState<Record<string, number>>({});
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [novelFontSize, setNovelFontSize] = useState<number>(() => {
+    if (typeof window === "undefined") return 17;
+    const saved = Number(window.localStorage.getItem("nuvia.novelFontSize"));
+    return Number.isFinite(saved) && saved >= 12 && saved <= 28 ? saved : 17;
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") window.localStorage.setItem("nuvia.novelFontSize", String(novelFontSize));
+  }, [novelFontSize]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sampledRef = useRef<Set<string>>(new Set());
@@ -100,13 +127,20 @@ function ReaderPage() {
         const { data: pageRows, error: pagesError } = await supabase
           .from("chapter_pages").select("*").eq("chapter_id", currentChapter.id).order("page_number", { ascending: true });
         if (pagesError) throw pagesError;
-        const loadedPages = pageRows ?? [];
+        const loadedPages = normalizePages(pageRows ?? []);
+        // eslint-disable-next-line no-console
+        console.log("[Reader] Chapter data:", { series: s, chapter: currentChapter, pages: loadedPages });
         setPages(loadedPages);
         setPagesLoading(false);
         if (loadedPages.length === 0) {
-          setDebugMessage(`Debug: Chapter ID ${currentChapter.id} reached. No images were returned from your Laravel API.`);
+          setDebugMessage(`Debug: Chapter ID ${currentChapter.id} reached. No pages were returned from the database.`);
         }
         return;
+      }
+      // Novel — log the content for debugging
+      if (s.type !== "manga") {
+        // eslint-disable-next-line no-console
+        console.log("[Reader] Novel chapter:", { series: s, chapter: currentChapter, contentLength: currentChapter.content?.length ?? 0 });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown reader error";
@@ -463,38 +497,107 @@ function ReaderPage() {
               <div className="mx-auto max-w-xl rounded-2xl glass-card p-5 text-left shadow-card">
                 <div className="flex items-start gap-3 text-primary">
                   <AlertCircle className="h-5 w-5 mt-0.5" />
-                  <div className="space-y-2">
-                    <h2 className="text-lg font-bold text-foreground">No reader images found</h2>
-                     <p className="text-sm text-muted-foreground">{debugMessage ?? `Debug: Chapter ID ${chapter.id} reached. No images were returned from your Laravel API.`}</p>
+                  <div className="space-y-3">
+                    <h2 className="text-lg font-bold text-foreground">No reader pages found</h2>
+                    <p className="text-sm text-muted-foreground">{debugMessage ?? `Debug: Chapter ID ${chapter.id} reached. No pages were returned from the database.`}</p>
                     {errorMessage && <p className="text-xs text-destructive">{errorMessage}</p>}
+                    <Button onClick={() => load()} size="sm" className="bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full">
+                      <RefreshCw className="h-4 w-4 mr-1.5" /> Retry
+                    </Button>
                   </div>
                 </div>
               </div>
             </div>
           ) : (
-            pages.map((p, i) => (
-              <motion.img
-                key={p.id}
-                src={p.image_url}
-                alt={`Page ${p.page_number}`}
-                loading={i < 2 ? "eager" : "lazy"}
-                decoding="async"
-                fetchPriority={i < 2 ? "high" : "low"}
-                draggable={false}
-                crossOrigin="anonymous"
-                onLoad={(e) => { if (i < 4) samplePage(e.currentTarget, p.id); }}
-                initial={{ opacity: 0, y: 8 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-10% 0px -10% 0px" }}
-                transition={{ duration: 0.45, ease: [0.22, 0.61, 0.36, 1] }}
-                className="w-full block select-none [content-visibility:auto] [contain-intrinsic-size:1200px] shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
-              />
-            ))
+            pages.map((p, i) => {
+              const retryKey = imageRetry[p.id] ?? 0;
+              const src = retryKey > 0 ? `${p.image_url}${p.image_url.includes("?") ? "&" : "?"}r=${retryKey}` : p.image_url;
+              const failed = failedImages.has(p.id);
+              return failed ? (
+                <div key={p.id} className="w-full bg-white/5 border border-white/10 py-10 my-2 flex flex-col items-center justify-center gap-3 text-white/80">
+                  <AlertCircle className="h-6 w-6 text-destructive" />
+                  <p className="text-sm">Page {p.page_number} failed to load</p>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setFailedImages((prev) => { const n = new Set(prev); n.delete(p.id); return n; });
+                      setImageRetry((prev) => ({ ...prev, [p.id]: (prev[p.id] ?? 0) + 1 }));
+                    }}
+                    className="bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-1.5" /> Retry
+                  </Button>
+                </div>
+              ) : (
+                <motion.img
+                  key={p.id}
+                  src={src}
+                  alt={`Page ${p.page_number}`}
+                  loading={i < 2 ? "eager" : "lazy"}
+                  decoding="async"
+                  fetchPriority={i < 2 ? "high" : "low"}
+                  draggable={false}
+                  crossOrigin="anonymous"
+                  onLoad={(e) => { if (i < 4) samplePage(e.currentTarget, p.id); }}
+                  onError={() => {
+                    // eslint-disable-next-line no-console
+                    console.warn("[Reader] Image failed:", p.image_url);
+                    setFailedImages((prev) => new Set(prev).add(p.id));
+                  }}
+                  initial={{ opacity: 0, y: 8 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-10% 0px -10% 0px" }}
+                  transition={{ duration: 0.45, ease: [0.22, 0.61, 0.36, 1] }}
+                  className="w-full block select-none [content-visibility:auto] [contain-intrinsic-size:1200px] shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                />
+              );
+            })
           )
         ) : (
-          <article className="prose prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-base text-white/90">
-            {chapter.content || "No content."}
-          </article>
+          <div className="px-4">
+            {/* Novel font-size controls */}
+            <div className="mb-6 flex items-center justify-end gap-2">
+              <span className="text-xs uppercase tracking-wider text-white/60 font-bold inline-flex items-center gap-1">
+                <Type className="h-3.5 w-3.5" /> Text size
+              </span>
+              <button
+                onClick={() => setNovelFontSize((s) => Math.max(12, s - 1))}
+                aria-label="Decrease text size"
+                className="haptic h-8 w-8 grid place-items-center rounded-full bg-white/10 hover:bg-white/15 text-white text-sm font-bold ring-1 ring-white/15"
+              >
+                A−
+              </button>
+              <span className="text-xs tabular-nums text-white/70 w-8 text-center">{novelFontSize}</span>
+              <button
+                onClick={() => setNovelFontSize((s) => Math.min(28, s + 1))}
+                aria-label="Increase text size"
+                className="haptic h-8 w-8 grid place-items-center rounded-full bg-white/10 hover:bg-white/15 text-white text-sm font-bold ring-1 ring-white/15"
+              >
+                A+
+              </button>
+            </div>
+            {chapter.content && chapter.content.trim().length > 0 ? (
+              <article
+                className="prose prose-invert max-w-none whitespace-pre-wrap leading-[1.8] text-white/90"
+                style={{ fontSize: `${novelFontSize}px` }}
+              >
+                {chapter.content}
+              </article>
+            ) : (
+              <div className="mx-auto max-w-xl rounded-2xl glass-card p-5 text-left shadow-card">
+                <div className="flex items-start gap-3 text-primary">
+                  <AlertCircle className="h-5 w-5 mt-0.5" />
+                  <div className="space-y-3">
+                    <h2 className="text-lg font-bold text-foreground">No chapter text found</h2>
+                    <p className="text-sm text-muted-foreground">Debug: Chapter ID {chapter.id} loaded, but no <code>content</code> was returned.</p>
+                    <Button onClick={() => load()} size="sm" className="bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full">
+                      <RefreshCw className="h-4 w-4 mr-1.5" /> Retry
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* End-of-chapter CTA */}
