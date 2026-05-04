@@ -30,6 +30,7 @@ import {
   StopCircle,
   RefreshCw,
 } from "lucide-react";
+import { ChapterUrlUploadView } from "./chapter-url-upload";
 
 type Job = {
   id: string;
