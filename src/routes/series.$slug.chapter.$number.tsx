@@ -146,14 +146,23 @@ function ReaderPage() {
         }
         return;
       }
-      // Novel — log the content for debugging
+      // Novel — fetch content via secured RPC (gates paid content server-side)
       if (s.type !== "manga") {
-        // eslint-disable-next-line no-console
-        console.log("[Reader] Novel chapter:", {
-          series: s,
-          chapter: currentChapter,
-          contentLength: currentChapter.content?.length ?? 0,
-        });
+        setNovelContent(null);
+        if (access) {
+          const { data: contentData, error: contentErr } = await supabase.rpc("get_chapter_content", {
+            _chapter_id: currentChapter.id,
+          });
+          if (contentErr) throw contentErr;
+          const text = typeof contentData === "string" ? contentData : null;
+          setNovelContent(text);
+          // eslint-disable-next-line no-console
+          console.log("[Reader] Novel chapter:", {
+            series: s,
+            chapter: currentChapter,
+            contentLength: text?.length ?? 0,
+          });
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown reader error";
