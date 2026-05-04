@@ -679,12 +679,12 @@ function ReaderPage() {
                 A+
               </button>
             </div>
-            {chapter.content && chapter.content.trim().length > 0 ? (
+            {novelContent && novelContent.trim().length > 0 ? (
               <article
                 className="prose prose-invert max-w-none whitespace-pre-wrap leading-[1.8] text-white/90"
                 style={{ fontSize: `${novelFontSize}px` }}
               >
-                {chapter.content}
+                {novelContent}
               </article>
             ) : (
               <div className="mx-auto max-w-xl rounded-2xl glass-card p-5 text-left shadow-card">
