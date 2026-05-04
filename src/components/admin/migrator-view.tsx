@@ -216,6 +216,9 @@ export function MigratorView() {
         </p>
       </div>
 
+      {/* Manual URL upload (Drive / Gofile) */}
+      <ChapterUrlUploadView />
+
       {/* Jobs list */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
