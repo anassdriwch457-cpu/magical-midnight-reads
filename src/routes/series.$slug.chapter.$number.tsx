@@ -93,7 +93,7 @@ function ReaderPage() {
 
       const { data: chapterRows, error: chaptersError } = await supabase
         .from("chapters")
-        .select("id, series_id, number, title, price, created_at, source_url")
+        .select("id, series_id, number, title, price, content, created_at, source_url")
         .eq("series_id", s.id)
         .order("number", { ascending: true });
       if (chaptersError) throw chaptersError;
@@ -483,15 +483,26 @@ function ReaderPage() {
                 <SpringNumber value={wallet?.coins ?? 0} className="font-semibold text-foreground tabular-nums" />
               </p>
             )}
-            <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={SPRING.snap}>
-              <Button
-                onClick={handleUnlock}
-                disabled={unlocking}
-                className="focus-ring w-full bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-11 shadow-glow"
-              >
-                {unlocking ? "UNLOCKING…" : user ? "UNLOCK CHAPTER" : "SIGN IN TO UNLOCK"}
-              </Button>
-            </motion.div>
+            {!user ? (
+              <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={SPRING.snap}>
+                <Button
+                  onClick={() => navigate({ to: "/auth" })}
+                  className="focus-ring w-full bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-11 shadow-glow"
+                >
+                  SIGN IN TO UNLOCK
+                </Button>
+              </motion.div>
+            ) : (
+              <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={SPRING.snap}>
+                <Button
+                  onClick={handleUnlock}
+                  disabled={unlocking}
+                  className="focus-ring w-full bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-11 shadow-glow"
+                >
+                  {unlocking ? "UNLOCKING…" : "UNLOCK CHAPTER"}
+                </Button>
+              </motion.div>
+            )}
             <Button asChild variant="ghost" className="w-full mt-2 text-white/80 hover:text-white">
               <Link to="/topup">Need more coins? Top up →</Link>
             </Button>
