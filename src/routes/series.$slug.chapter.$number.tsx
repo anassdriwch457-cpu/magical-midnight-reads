@@ -92,7 +92,7 @@ function ReaderPage() {
 
       const { data: chapterRows, error: chaptersError } = await supabase
         .from("chapters")
-        .select("*")
+        .select("id, series_id, number, title, price, created_at, source_url")
         .eq("series_id", s.id)
         .order("number", { ascending: true });
       if (chaptersError) throw chaptersError;
