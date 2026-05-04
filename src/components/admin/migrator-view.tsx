@@ -30,6 +30,7 @@ import {
   StopCircle,
   RefreshCw,
 } from "lucide-react";
+import { ChapterUrlUploadView } from "./chapter-url-upload";
 
 type Job = {
   id: string;
@@ -214,6 +215,9 @@ export function MigratorView() {
           on the next time it&apos;s resumed. Pause if you want to stop fetching.
         </p>
       </div>
+
+      {/* Manual URL upload (Drive / Gofile) */}
+      <ChapterUrlUploadView />
 
       {/* Jobs list */}
       <div className="space-y-3">
