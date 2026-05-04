@@ -23,7 +23,7 @@ import { SparkleBurst } from "@/components/sparkle-burst";
 import { motion, SPRING, SpringNumber } from "@/lib/motion";
 import { resolveImage, PLACEHOLDER_COVER } from "@/lib/image";
 
-type Chapter = Tables<"chapters">;
+type Chapter = Omit<Tables<"chapters">, "content">;
 type Page = Tables<"chapter_pages">;
 type Series = Tables<"series">;
 
