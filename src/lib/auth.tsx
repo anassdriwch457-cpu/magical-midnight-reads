@@ -2,6 +2,37 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { supabase } from "@/integrations/supabase/client";
 import type { Session as SupabaseSession, User as SupabaseUser } from "@supabase/supabase-js";
 
+// Global fetch interceptor: attach the current Supabase access token to
+// internal server-function calls so middleware-protected handlers receive auth.
+if (typeof window !== "undefined" && !(window as unknown as { __sfFetchPatched?: boolean }).__sfFetchPatched) {
+  (window as unknown as { __sfFetchPatched?: boolean }).__sfFetchPatched = true;
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    try {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input instanceof Request
+              ? input.url
+              : "";
+      if (url.includes("/_serverFn/")) {
+        const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        if (!headers.has("authorization")) {
+          const { data } = await supabase.auth.getSession();
+          const token = data.session?.access_token;
+          if (token) headers.set("Authorization", `Bearer ${token}`);
+        }
+        return originalFetch(input, { ...init, headers });
+      }
+    } catch (e) {
+      console.error("[auth-fetch] interceptor error", e);
+    }
+    return originalFetch(input, init);
+  };
+}
+
 export type Role = "user" | "admin" | "super_admin" | "manager";
 
 interface Wallet { coins: number }
