@@ -42,6 +42,7 @@ function ReaderPage() {
 
   const [series, setSeries] = useState<Series | null>(null);
   const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [novelContent, setNovelContent] = useState<string | null>(null);
   const [pages, setPages] = useState<Page[]>([]);
   const [allChapters, setAllChapters] = useState<Chapter[]>([]);
   const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
