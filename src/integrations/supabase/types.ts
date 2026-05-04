@@ -41,13 +41,6 @@ export type Database = {
             referencedRelation: "chapters"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "chapter_pages_chapter_id_fkey"
-            columns: ["chapter_id"]
-            isOneToOne: false
-            referencedRelation: "chapters_public"
-            referencedColumns: ["id"]
-          },
         ]
       }
       chapter_unlocks: {
@@ -78,13 +71,6 @@ export type Database = {
             columns: ["chapter_id"]
             isOneToOne: false
             referencedRelation: "chapters"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "chapter_unlocks_chapter_id_fkey"
-            columns: ["chapter_id"]
-            isOneToOne: false
-            referencedRelation: "chapters_public"
             referencedColumns: ["id"]
           },
         ]
@@ -403,44 +389,7 @@ export type Database = {
       }
     }
     Views: {
-      chapters_public: {
-        Row: {
-          created_at: string | null
-          id: string | null
-          number: number | null
-          price: number | null
-          series_id: string | null
-          source_url: string | null
-          title: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string | null
-          number?: number | null
-          price?: number | null
-          series_id?: string | null
-          source_url?: string | null
-          title?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string | null
-          number?: number | null
-          price?: number | null
-          series_id?: string | null
-          source_url?: string | null
-          title?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "chapters_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "series"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       adjust_user_coins: {
@@ -512,6 +461,7 @@ export type Database = {
           signups: number
         }[]
       }
+      get_chapter_content: { Args: { _chapter_id: string }; Returns: string }
       has_chapter_access: {
         Args: { _chapter_id: string; _user_id: string }
         Returns: boolean
