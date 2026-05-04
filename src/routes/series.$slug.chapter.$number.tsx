@@ -23,7 +23,7 @@ import { SparkleBurst } from "@/components/sparkle-burst";
 import { motion, SPRING, SpringNumber } from "@/lib/motion";
 import { resolveImage, PLACEHOLDER_COVER } from "@/lib/image";
 
-type Chapter = Tables<"chapters">;
+type Chapter = Omit<Tables<"chapters">, "content">;
 type Page = Tables<"chapter_pages">;
 type Series = Tables<"series">;
 
@@ -42,6 +42,7 @@ function ReaderPage() {
 
   const [series, setSeries] = useState<Series | null>(null);
   const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [novelContent, setNovelContent] = useState<string | null>(null);
   const [pages, setPages] = useState<Page[]>([]);
   const [allChapters, setAllChapters] = useState<Chapter[]>([]);
   const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
@@ -92,7 +93,7 @@ function ReaderPage() {
 
       const { data: chapterRows, error: chaptersError } = await supabase
         .from("chapters")
-        .select("*")
+        .select("id, series_id, number, title, price, created_at, source_url")
         .eq("series_id", s.id)
         .order("number", { ascending: true });
       if (chaptersError) throw chaptersError;
@@ -145,14 +146,23 @@ function ReaderPage() {
         }
         return;
       }
-      // Novel — log the content for debugging
+      // Novel — fetch content via secured RPC (gates paid content server-side)
       if (s.type !== "manga") {
-        // eslint-disable-next-line no-console
-        console.log("[Reader] Novel chapter:", {
-          series: s,
-          chapter: currentChapter,
-          contentLength: currentChapter.content?.length ?? 0,
-        });
+        setNovelContent(null);
+        if (access) {
+          const { data: contentData, error: contentErr } = await supabase.rpc("get_chapter_content", {
+            _chapter_id: currentChapter.id,
+          });
+          if (contentErr) throw contentErr;
+          const text = typeof contentData === "string" ? contentData : null;
+          setNovelContent(text);
+          // eslint-disable-next-line no-console
+          console.log("[Reader] Novel chapter:", {
+            series: s,
+            chapter: currentChapter,
+            contentLength: text?.length ?? 0,
+          });
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown reader error";
@@ -669,12 +679,12 @@ function ReaderPage() {
                 A+
               </button>
             </div>
-            {chapter.content && chapter.content.trim().length > 0 ? (
+            {novelContent && novelContent.trim().length > 0 ? (
               <article
                 className="prose prose-invert max-w-none whitespace-pre-wrap leading-[1.8] text-white/90"
                 style={{ fontSize: `${novelFontSize}px` }}
               >
-                {chapter.content}
+                {novelContent}
               </article>
             ) : (
               <div className="mx-auto max-w-xl rounded-2xl glass-card p-5 text-left shadow-card">

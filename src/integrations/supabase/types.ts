@@ -461,6 +461,7 @@ export type Database = {
           signups: number
         }[]
       }
+      get_chapter_content: { Args: { _chapter_id: string }; Returns: string }
       has_chapter_access: {
         Args: { _chapter_id: string; _user_id: string }
         Returns: boolean
