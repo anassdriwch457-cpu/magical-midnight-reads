@@ -165,7 +165,15 @@ function ReaderPage() {
         }
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown reader error";
+      const err = error as { message?: string; details?: string; hint?: string; code?: string } | Error;
+      const parts = [
+        (err as { message?: string }).message,
+        (err as { details?: string }).details,
+        (err as { hint?: string }).hint,
+        (err as { code?: string }).code ? `(code: ${(err as { code?: string }).code})` : null,
+      ].filter(Boolean);
+      const message = parts.length > 0 ? parts.join(" — ") : "Unknown reader error";
+      console.error("[Reader] load failed:", error);
       setErrorMessage(message);
       setDebugMessage(`Debug: Reader route loaded for ${slug} chapter ${number}, but fetching failed: ${message}`);
       setPagesLoading(false);
