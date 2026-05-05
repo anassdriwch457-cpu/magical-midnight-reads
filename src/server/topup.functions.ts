@@ -27,7 +27,11 @@ async function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY is not configured");
   const Stripe = (await import("stripe")).default;
-  return new Stripe(key, { apiVersion: "2025-08-27.basil" as never });
+  // Cloudflare Workers / edge: must use fetch http client + SubtleCrypto.
+  return new Stripe(key, {
+    apiVersion: "2025-08-27.basil" as never,
+    httpClient: Stripe.createFetchHttpClient(),
+  });
 }
 
 /**
