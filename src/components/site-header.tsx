@@ -12,17 +12,41 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
-  Coins, Sparkles, Moon, Square, User, LogOut, Shield, Palette, Search, X,
+  Coins,
+  Sparkles,
+  Moon,
+  Square,
+  User,
+  LogOut,
+  Shield,
+  Palette,
+  Search,
+  X,
 } from "lucide-react";
 import { CoinBadge } from "@/components/coin-badge";
-import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/nuvia-logo.png";
 import { resolveImage, onImageError } from "@/lib/image";
 import { motion, AnimatePresence, SPRING } from "@/lib/motion";
+import { api } from "@/lib/api";
 
-type SearchHit = { id: string; title: string; slug: string; cover_url: string | null; type: string };
+type SearchHit = {
+  id: string;
+  title: string;
+  slug: string;
+  cover_url: string | null;
+  type: string;
+};
 
-const PRESET_ACCENTS = ["#F47521", "#E11D48", "#7C3AED", "#3B82F6", "#10B981", "#F59E0B", "#EC4899", "#06B6D4"];
+const PRESET_ACCENTS = [
+  "#F47521",
+  "#E11D48",
+  "#7C3AED",
+  "#3B82F6",
+  "#10B981",
+  "#F59E0B",
+  "#EC4899",
+  "#06B6D4",
+];
 
 const NAV = [
   { to: "/", label: "HOME" },
@@ -53,15 +77,21 @@ export function SiteHeader() {
 
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 2) { setHits([]); return; }
+    if (q.length < 2) {
+      setHits([]);
+      return;
+    }
     const t = setTimeout(async () => {
       setSearching(true);
-      const { data } = await supabase
-        .from("series")
-        .select("id, title, slug, cover_url, type")
-        .ilike("title", `%${q}%`)
-        .limit(6);
-      setHits(data ?? []);
+      try {
+        const res = await api.get<{ data: SearchHit[] }>(
+          `/series?q=${encodeURIComponent(q)}&per_page=6&sort=title&dir=asc`,
+        );
+        setHits(res.data ?? []);
+      } catch (err) {
+        console.error("Search failed", err);
+        setHits([]);
+      }
       setSearching(false);
     }, 220);
     return () => clearTimeout(t);
@@ -107,7 +137,9 @@ export function SiteHeader() {
           : "bg-gradient-to-b from-black/65 via-black/25 to-transparent backdrop-blur-sm border-b border-transparent"
       }`}
     >
-      <div className={`container mx-auto flex items-center justify-between px-4 transition-all duration-500 ${scrolled ? "h-14" : "h-16"}`}>
+      <div
+        className={`container mx-auto flex items-center justify-between px-4 transition-all duration-500 ${scrolled ? "h-14" : "h-16"}`}
+      >
         {/* WORDMARK */}
         <Link to="/" className="focus-ring rounded-md flex items-center gap-2.5 group shrink-0">
           <motion.img
@@ -120,12 +152,16 @@ export function SiteHeader() {
             transition={SPRING.snap}
           />
           <div className="leading-tight">
-            <div className={`font-semibold tracking-tight text-white transition-all duration-300 ${scrolled ? "text-[17px]" : "text-[19px]"}`}>
+            <div
+              className={`font-semibold tracking-tight text-white transition-all duration-300 ${scrolled ? "text-[17px]" : "text-[19px]"}`}
+            >
               <span className="wordmark text-aurora">Nuvia</span>
               <span className="wordmark text-white/95"> Toon</span>
             </div>
             <div className="text-[9px] uppercase tracking-[0.24em] text-white/50 font-medium">
-              Your Next <span className="wordmark not-italic font-medium text-primary/95">Paradise</span> in Every Page
+              Your Next{" "}
+              <span className="wordmark not-italic font-medium text-primary/95">Paradise</span> in
+              Every Page
             </div>
           </div>
         </Link>
@@ -186,9 +222,15 @@ export function SiteHeader() {
               <Search className="h-4 w-4 text-white/70 ml-3" />
               <input
                 value={query}
-                onChange={(e) => { setQuery(e.target.value); setSearchOpen(true); }}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setSearchOpen(true);
+                }}
                 onFocus={() => setSearchOpen(true)}
-                onKeyDown={(e) => { if (e.key === "Enter") submitSearch(query); if (e.key === "Escape") setSearchOpen(false); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submitSearch(query);
+                  if (e.key === "Escape") setSearchOpen(false);
+                }}
                 placeholder="Search series…"
                 className="bg-transparent text-sm text-white placeholder:text-white/50 px-2 py-2 flex-1 outline-none"
               />
@@ -198,7 +240,14 @@ export function SiteHeader() {
                 </kbd>
               )}
               {query && (
-                <button onClick={() => { setQuery(""); setHits([]); }} className="mr-2 text-white/60 hover:text-white" aria-label="Clear">
+                <button
+                  onClick={() => {
+                    setQuery("");
+                    setHits([]);
+                  }}
+                  className="mr-2 text-white/60 hover:text-white"
+                  aria-label="Clear"
+                >
                   <X className="h-4 w-4" />
                 </button>
               )}
@@ -216,7 +265,9 @@ export function SiteHeader() {
                   {searching && hits.length === 0 ? (
                     <div className="px-4 py-5 text-sm text-muted-foreground">Searching…</div>
                   ) : hits.length === 0 ? (
-                    <div className="px-4 py-5 text-sm text-muted-foreground">No matches for "{query}"</div>
+                    <div className="px-4 py-5 text-sm text-muted-foreground">
+                      No matches for "{query}"
+                    </div>
                   ) : (
                     <>
                       <ul className="max-h-80 overflow-auto">
@@ -225,13 +276,25 @@ export function SiteHeader() {
                             <Link
                               to="/series/$slug"
                               params={{ slug: h.slug }}
-                              onClick={() => { setSearchOpen(false); setQuery(""); }}
+                              onClick={() => {
+                                setSearchOpen(false);
+                                setQuery("");
+                              }}
                               className="flex items-center gap-3 px-3 py-2 hover:bg-white/5 transition-colors"
                             >
-                              <img src={resolveImage(h.cover_url)} onError={onImageError} alt="" className="h-12 w-9 object-cover rounded-md bg-muted shrink-0 ring-1 ring-white/10" />
+                              <img
+                                src={resolveImage(h.cover_url)}
+                                onError={onImageError}
+                                alt=""
+                                className="h-12 w-9 object-cover rounded-md bg-muted shrink-0 ring-1 ring-white/10"
+                              />
                               <div className="min-w-0">
-                                <div className="text-sm font-bold truncate text-foreground">{h.title}</div>
-                                <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{h.type}</div>
+                                <div className="text-sm font-bold truncate text-foreground">
+                                  {h.title}
+                                </div>
+                                <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                                  {h.type}
+                                </div>
                               </div>
                             </Link>
                           </li>
@@ -253,20 +316,41 @@ export function SiteHeader() {
           {/* THEME */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Theme" className="focus-ring text-white hover:text-primary hover:bg-white/10">
-                {theme === "magic" ? <Sparkles className="h-[18px] w-[18px]" /> : theme === "midnight" ? <Moon className="h-[18px] w-[18px]" /> : theme === "concrete" ? <Square className="h-[18px] w-[18px]" /> : <Palette className="h-[18px] w-[18px]" />}
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Theme"
+                className="focus-ring text-white hover:text-primary hover:bg-white/10"
+              >
+                {theme === "magic" ? (
+                  <Sparkles className="h-[18px] w-[18px]" />
+                ) : theme === "midnight" ? (
+                  <Moon className="h-[18px] w-[18px]" />
+                ) : theme === "concrete" ? (
+                  <Square className="h-[18px] w-[18px]" />
+                ) : (
+                  <Palette className="h-[18px] w-[18px]" />
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-60">
               <DropdownMenuLabel>Theme</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setTheme("magic")}><Sparkles className="mr-2 h-4 w-4" /> Magic</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("midnight")}><Moon className="mr-2 h-4 w-4" /> Midnight</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("concrete")}><Square className="mr-2 h-4 w-4" /> Concrete</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("magic")}>
+                <Sparkles className="mr-2 h-4 w-4" /> Magic
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("midnight")}>
+                <Moon className="mr-2 h-4 w-4" /> Midnight
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("concrete")}>
+                <Square className="mr-2 h-4 w-4" /> Concrete
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="flex items-center gap-2"><Palette className="h-3.5 w-3.5" /> Custom Accent</DropdownMenuLabel>
+              <DropdownMenuLabel className="flex items-center gap-2">
+                <Palette className="h-3.5 w-3.5" /> Custom Accent
+              </DropdownMenuLabel>
               <div className="px-2 pb-2 space-y-2">
                 <div className="grid grid-cols-8 gap-1.5">
-                  {PRESET_ACCENTS.map(c => {
+                  {PRESET_ACCENTS.map((c) => {
                     const active = accent.toLowerCase() === c.toLowerCase() && theme === "custom";
                     return (
                       <button
@@ -297,15 +381,33 @@ export function SiteHeader() {
               <CoinBadge coins={wallet?.coins ?? 0} />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="focus-ring text-white hover:text-primary hover:bg-white/10"><User className="h-[18px] w-[18px]" /></Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="focus-ring text-white hover:text-primary hover:bg-white/10"
+                  >
+                    <User className="h-[18px] w-[18px]" />
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild><Link to="/topup"><Coins className="mr-2 h-4 w-4" /> Top Up Coins</Link></DropdownMenuItem>
-                  {isAdmin && <DropdownMenuItem asChild><Link to="/admin"><Shield className="mr-2 h-4 w-4" /> Admin</Link></DropdownMenuItem>}
+                  <DropdownMenuItem asChild>
+                    <Link to="/topup">
+                      <Coins className="mr-2 h-4 w-4" /> Top Up Coins
+                    </Link>
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin">
+                        <Shield className="mr-2 h-4 w-4" /> Admin
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={signOut}><LogOut className="mr-2 h-4 w-4" /> Sign out</DropdownMenuItem>
+                  <DropdownMenuItem onClick={signOut}>
+                    <LogOut className="mr-2 h-4 w-4" /> Sign out
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </>

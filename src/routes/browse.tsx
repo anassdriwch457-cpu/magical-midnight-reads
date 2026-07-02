@@ -1,19 +1,44 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { SeriesCard } from "@/components/series-card";
 import { Button } from "@/components/ui/button";
 import { GenreBar } from "@/components/genre-bar";
 import { EmptyState } from "@/components/empty-state";
 import { SearchX } from "lucide-react";
+import { api } from "@/lib/api";
 
 type Series = Tables<"series">;
+type SeriesIndexResponse = { data: Series[]; total: number };
 const PAGE_SIZE = 18;
-const GENRES = ["All", "Action", "Fantasy", "Romance", "Adventure", "Magic", "Drama", "Mystery", "Supernatural", "School Life"];
-const TYPES = [{ k: "all", l: "All" }, { k: "manga", l: "Manga" }, { k: "novel", l: "Novel" }] as const;
-const STATUSES = [{ k: "all", l: "All" }, { k: "ongoing", l: "Ongoing" }, { k: "completed", l: "Completed" }, { k: "hiatus", l: "Hiatus" }] as const;
-const SORTS = [{ k: "latest", l: "Latest" }, { k: "popular", l: "Popular" }, { k: "title", l: "A–Z" }] as const;
+const GENRES = [
+  "All",
+  "Action",
+  "Fantasy",
+  "Romance",
+  "Adventure",
+  "Magic",
+  "Drama",
+  "Mystery",
+  "Supernatural",
+  "School Life",
+];
+const TYPES = [
+  { k: "all", l: "All" },
+  { k: "manga", l: "Manga" },
+  { k: "novel", l: "Novel" },
+] as const;
+const STATUSES = [
+  { k: "all", l: "All" },
+  { k: "ongoing", l: "Ongoing" },
+  { k: "completed", l: "Completed" },
+  { k: "hiatus", l: "Hiatus" },
+] as const;
+const SORTS = [
+  { k: "latest", l: "Latest" },
+  { k: "popular", l: "Popular" },
+  { k: "title", l: "A–Z" },
+] as const;
 
 export const Route = createFileRoute("/browse")({
   component: BrowsePage,
@@ -41,29 +66,44 @@ function BrowsePage() {
   const [loading, setLoading] = useState(false);
   const q = search.q?.trim() ?? "";
 
-  useEffect(() => { setType(search.type ?? "all"); setPage(0); }, [search.type, search.q]);
+  useEffect(() => {
+    setType(search.type ?? "all");
+    setPage(0);
+  }, [search.type, search.q]);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      let qb = supabase.from("series").select("*", { count: "exact" });
-      if (type !== "all") qb = qb.eq("type", type as "manga" | "novel");
-      if (status !== "all") qb = qb.eq("status", status as "ongoing" | "completed" | "hiatus");
-      if (genre !== "All") qb = qb.contains("genres", [genre]);
-      if (q) qb = qb.ilike("title", `%${q}%`);
-      if (sort === "latest") qb = qb.order("created_at", { ascending: false });
-      else if (sort === "popular") qb = qb.order("views", { ascending: false });
-      else if (sort === "title") qb = qb.order("title", { ascending: true });
-      const from = page * PAGE_SIZE;
-      const { data, count: c } = await qb.range(from, from + PAGE_SIZE - 1);
-      setItems(data ?? []);
-      setCount(c ?? 0);
+      const params = new URLSearchParams();
+      params.set("per_page", String(PAGE_SIZE));
+      params.set("page", String(page + 1));
+      if (type !== "all") params.set("type", type);
+      if (status !== "all") params.set("status", status);
+      if (genre !== "All") params.set("genre", genre);
+      if (q) params.set("q", q);
+      if (sort === "latest") {
+        params.set("sort", "updated_at");
+        params.set("dir", "desc");
+      } else if (sort === "popular") {
+        params.set("sort", "views");
+        params.set("dir", "desc");
+      } else if (sort === "title") {
+        params.set("sort", "title");
+        params.set("dir", "asc");
+      }
+
+      const res = await api.get<SeriesIndexResponse>(`/series?${params.toString()}`);
+      setItems(res.data ?? []);
+      setCount(res.total ?? 0);
       setLoading(false);
     })();
   }, [type, status, genre, sort, page, q]);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(count / PAGE_SIZE)), [count]);
-  const reset = (fn: () => void) => { fn(); setPage(0); };
+  const reset = (fn: () => void) => {
+    fn();
+    setPage(0);
+  };
 
   return (
     <div className="pb-16 pt-16">
@@ -78,17 +118,39 @@ function BrowsePage() {
         </div>
 
         <div className="space-y-4 mb-8">
-          <TabRow label="Type" options={TYPES} value={type} onChange={(v) => reset(() => setType(v))} />
-          <TabRow label="Genre" options={GENRES.map(g => ({ k: g, l: g }))} value={genre} onChange={(v) => reset(() => setGenre(v))} />
+          <TabRow
+            label="Type"
+            options={TYPES}
+            value={type}
+            onChange={(v) => reset(() => setType(v))}
+          />
+          <TabRow
+            label="Genre"
+            options={GENRES.map((g) => ({ k: g, l: g }))}
+            value={genre}
+            onChange={(v) => reset(() => setGenre(v))}
+          />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <TabRow label="Status" options={STATUSES} value={status} onChange={(v) => reset(() => setStatus(v))} />
-            <TabRow label="Sort" options={SORTS} value={sort} onChange={(v) => reset(() => setSort(v))} />
+            <TabRow
+              label="Status"
+              options={STATUSES}
+              value={status}
+              onChange={(v) => reset(() => setStatus(v))}
+            />
+            <TabRow
+              label="Sort"
+              options={SORTS}
+              value={sort}
+              onChange={(v) => reset(() => setSort(v))}
+            />
           </div>
         </div>
 
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
-            {Array.from({ length: 12 }).map((_, i) => <div key={i} className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />)}
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />
+            ))}
           </div>
         ) : items.length === 0 ? (
           <EmptyState
@@ -99,7 +161,13 @@ function BrowsePage() {
               <Button
                 variant="outline"
                 className="rounded-full"
-                onClick={() => { setType("all"); setStatus("all"); setGenre("All"); setSort("latest"); setPage(0); }}
+                onClick={() => {
+                  setType("all");
+                  setStatus("all");
+                  setGenre("All");
+                  setSort("latest");
+                  setPage(0);
+                }}
               >
                 Reset filters
               </Button>
@@ -107,15 +175,33 @@ function BrowsePage() {
           />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
-            {items.map(s => <SeriesCard key={s.id} series={s} />)}
+            {items.map((s) => (
+              <SeriesCard key={s.id} series={s} />
+            ))}
           </div>
         )}
 
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-12">
-            <Button variant="outline" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="rounded-[4px]">Previous</Button>
-            <span className="text-sm tabular-nums px-4 text-muted-foreground">Page {page + 1} of {totalPages}</span>
-            <Button variant="outline" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="rounded-[4px]">Next</Button>
+            <Button
+              variant="outline"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="rounded-[4px]"
+            >
+              Previous
+            </Button>
+            <span className="text-sm tabular-nums px-4 text-muted-foreground">
+              Page {page + 1} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              className="rounded-[4px]"
+            >
+              Next
+            </Button>
           </div>
         )}
       </div>
@@ -123,10 +209,22 @@ function BrowsePage() {
   );
 }
 
-function TabRow({ label, options, value, onChange }: { label: string; options: readonly { k: string; l: string }[]; value: string; onChange: (v: string) => void }) {
+function TabRow({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: readonly { k: string; l: string }[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-16 shrink-0">{label}</span>
+      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-16 shrink-0">
+        {label}
+      </span>
       <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {options.map((o) => (
           <button
