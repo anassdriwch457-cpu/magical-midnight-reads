@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
@@ -22,6 +21,7 @@ import { QuickSwitchDrawer } from "@/components/quick-switch-drawer";
 import { SparkleBurst } from "@/components/sparkle-burst";
 import { motion, SPRING, SpringNumber } from "@/lib/motion";
 import { resolveImage, PLACEHOLDER_COVER } from "@/lib/image";
+import { api } from "@/lib/api";
 
 type Chapter = Omit<Tables<"chapters">, "content">;
 type Page = Tables<"chapter_pages">;
@@ -67,7 +67,8 @@ function ReaderPage() {
     return Number.isFinite(saved) && saved >= 12 && saved <= 28 ? saved : 17;
   });
   useEffect(() => {
-    if (typeof window !== "undefined") window.localStorage.setItem("nuvia.novelFontSize", String(novelFontSize));
+    if (typeof window !== "undefined")
+      window.localStorage.setItem("nuvia.novelFontSize", String(novelFontSize));
   }, [novelFontSize]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,8 +82,7 @@ function ReaderPage() {
     setPagesLoading(false);
 
     try {
-      const { data: s, error: seriesError } = await supabase.from("series").select("*").eq("slug", slug).maybeSingle();
-      if (seriesError) throw seriesError;
+      const s = await api.get<Series>(`/series/${slug}`);
       if (!s) {
         setSeries(null);
         setChapter(null);
@@ -91,13 +91,7 @@ function ReaderPage() {
       }
       setSeries(s);
 
-      const { data: chapterRows, error: chaptersError } = await supabase
-        .from("chapters")
-        .select("id, series_id, number, title, price, created_at, source_url")
-        .eq("series_id", s.id)
-        .order("number", { ascending: true });
-      if (chaptersError) throw chaptersError;
-
+      const chapterRows = await api.get<Chapter[]>(`/series/${s.id}/chapters`);
       const allRows = chapterRows ?? [];
       setAllChapters(allRows);
 
@@ -107,7 +101,9 @@ function ReaderPage() {
         setChapter(null);
         setSiblings({});
         setUnlocked(false);
-        setDebugMessage(`Debug: Series "${s.title}" loaded, but chapter number ${number} was not found.`);
+        setDebugMessage(
+          `Debug: Series "${s.title}" loaded, but chapter number ${number} was not found.`,
+        );
         return;
       }
       setChapter(currentChapter);
@@ -120,7 +116,7 @@ function ReaderPage() {
 
       let access = currentChapter.price === 0;
       if (user) {
-        const { data: u } = await supabase.from("chapter_unlocks").select("chapter_id").eq("user_id", user.id);
+        const u = await api.get<{ chapter_id: string }[]>("/user/unlocks");
         const unlockedSet = new Set((u ?? []).map((x) => x.chapter_id));
         setUnlockedIds(unlockedSet);
         if (!access) access = unlockedSet.has(currentChapter.id);
@@ -130,19 +126,20 @@ function ReaderPage() {
       if (s.type === "manga" && access) {
         setLoading(false);
         setPagesLoading(true);
-        const { data: pageRows, error: pagesError } = await supabase
-          .from("chapter_pages")
-          .select("*")
-          .eq("chapter_id", currentChapter.id)
-          .order("page_number", { ascending: true });
-        if (pagesError) throw pagesError;
+        const pageRows = await api.get<Page[]>(`/chapters/${currentChapter.id}/pages`);
         const loadedPages = normalizePages(pageRows ?? []);
         // eslint-disable-next-line no-console
-        console.log("[Reader] Chapter data:", { series: s, chapter: currentChapter, pages: loadedPages });
+        console.log("[Reader] Chapter data:", {
+          series: s,
+          chapter: currentChapter,
+          pages: loadedPages,
+        });
         setPages(loadedPages);
         setPagesLoading(false);
         if (loadedPages.length === 0) {
-          setDebugMessage(`Debug: Chapter ID ${currentChapter.id} reached. No pages were returned from the database.`);
+          setDebugMessage(
+            `Debug: Chapter ID ${currentChapter.id} reached. No pages were returned from the database.`,
+          );
         }
         return;
       }
@@ -150,11 +147,10 @@ function ReaderPage() {
       if (s.type !== "manga") {
         setNovelContent(null);
         if (access) {
-          const { data: contentData, error: contentErr } = await supabase.rpc("get_chapter_content", {
-            _chapter_id: currentChapter.id,
-          });
-          if (contentErr) throw contentErr;
-          const text = typeof contentData === "string" ? contentData : null;
+          const contentData = await api.get<{ content?: string | null }>(
+            `/chapters/${currentChapter.id}`,
+          );
+          const text = typeof contentData?.content === "string" ? contentData.content : null;
           setNovelContent(text);
           // eslint-disable-next-line no-console
           console.log("[Reader] Novel chapter:", {
@@ -165,7 +161,9 @@ function ReaderPage() {
         }
       }
     } catch (error) {
-      const err = error as { message?: string; details?: string; hint?: string; code?: string } | Error;
+      const err = error as
+        | { message?: string; details?: string; hint?: string; code?: string }
+        | Error;
       const parts = [
         (err as { message?: string }).message,
         (err as { details?: string }).details,
@@ -175,7 +173,9 @@ function ReaderPage() {
       const message = parts.length > 0 ? parts.join(" — ") : "Unknown reader error";
       console.error("[Reader] load failed:", error);
       setErrorMessage(message);
-      setDebugMessage(`Debug: Reader route loaded for ${slug} chapter ${number}, but fetching failed: ${message}`);
+      setDebugMessage(
+        `Debug: Reader route loaded for ${slug} chapter ${number}, but fetching failed: ${message}`,
+      );
       setPagesLoading(false);
     } finally {
       setLoading(false);
@@ -281,28 +281,30 @@ function ReaderPage() {
     }
     if (!chapter) return;
     setUnlocking(true);
-    const { data, error } = await supabase.rpc("unlock_chapter", { _chapter_id: chapter.id });
-    setUnlocking(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      const data = await api.post<{ success: boolean; error?: string; balance?: number }>(
+        `/chapters/${chapter.id}/unlock`,
+      );
+      if (!data.success) {
+        if (data.error === "Insufficient coins") {
+          toast.error("Not enough coins. Top up to continue.");
+          navigate({ to: "/topup" });
+        } else toast.error(data.error ?? "Failed to unlock");
+        return;
+      }
+      setSparkle(true);
+      toast.success(`Chapter ${Number(chapter.number)} unlocked!`, {
+        description: `−${chapter.price} coins · Balance: ${data.balance ?? "—"} coins remaining`,
+        icon: "🔓",
+        duration: 4000,
+      });
+      await refreshWallet();
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to unlock");
+    } finally {
+      setUnlocking(false);
     }
-    const r = data as { success: boolean; error?: string; balance?: number };
-    if (!r.success) {
-      if (r.error === "Insufficient coins") {
-        toast.error("Not enough coins. Top up to continue.");
-        navigate({ to: "/topup" });
-      } else toast.error(r.error ?? "Failed to unlock");
-      return;
-    }
-    setSparkle(true);
-    toast.success(`Chapter ${Number(chapter.number)} unlocked!`, {
-      description: `−${chapter.price} coins · Balance: ${r.balance ?? "—"} coins remaining`,
-      icon: "🔓",
-      duration: 4000,
-    });
-    await refreshWallet();
-    await load();
   };
 
   const uiVisible = showUI && !cinematic;
@@ -324,10 +326,14 @@ function ReaderPage() {
             className="haptic flex items-center gap-2 text-sm text-white/90 hover:text-primary min-w-0"
           >
             <ArrowLeft className="h-4 w-4 shrink-0" />
-            <span className="font-bold truncate max-w-[40vw]">{series?.title ?? "Back to Series"}</span>
+            <span className="font-bold truncate max-w-[40vw]">
+              {series?.title ?? "Back to Series"}
+            </span>
           </Link>
           <div className="text-xs uppercase tracking-wider text-white/70 font-bold truncate hidden sm:block">
-            {chapter ? `CH ${Number(chapter.number)}${chapter.title ? ` · ${chapter.title}` : ""}` : `CH ${number}`}
+            {chapter
+              ? `CH ${Number(chapter.number)}${chapter.title ? ` · ${chapter.title}` : ""}`
+              : `CH ${number}`}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -343,7 +349,11 @@ function ReaderPage() {
               aria-label={cinematic ? "Exit cinematic mode" : "Enter cinematic mode"}
               className="haptic shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white"
             >
-              {cinematic ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              {cinematic ? (
+                <Minimize2 className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 className="h-3.5 w-3.5" />
+              )}
               <span className="hidden sm:inline">{cinematic ? "Exit" : "Cinema"}</span>
             </button>
           </div>
@@ -383,8 +393,15 @@ function ReaderPage() {
     >
       <div className="container mx-auto px-3 h-16 flex items-center justify-between gap-2">
         {siblings.prev !== undefined ? (
-          <Button asChild variant="ghost" className="haptic text-white hover:bg-white/10 rounded-full">
-            <Link to="/series/$slug/chapter/$number" params={{ slug, number: String(siblings.prev) }}>
+          <Button
+            asChild
+            variant="ghost"
+            className="haptic text-white hover:bg-white/10 rounded-full"
+          >
+            <Link
+              to="/series/$slug/chapter/$number"
+              params={{ slug, number: String(siblings.prev) }}
+            >
               <ChevronLeft className="h-4 w-4" /> <span className="hidden sm:inline">PREV</span>
             </Link>
           </Button>
@@ -405,7 +422,10 @@ function ReaderPage() {
             asChild
             className="haptic bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full px-5 shadow-glow"
           >
-            <Link to="/series/$slug/chapter/$number" params={{ slug, number: String(siblings.next) }}>
+            <Link
+              to="/series/$slug/chapter/$number"
+              params={{ slug, number: String(siblings.next) }}
+            >
               <span className="hidden sm:inline">NEXT</span> <ChevronRight className="h-4 w-4" />
             </Link>
           </Button>
@@ -439,9 +459,12 @@ function ReaderPage() {
             <div className="flex items-start gap-3 text-primary">
               <AlertCircle className="h-5 w-5 mt-0.5" />
               <div className="space-y-2">
-                <h1 className="text-lg font-bold text-foreground">Reader loaded, but this chapter is missing</h1>
+                <h1 className="text-lg font-bold text-foreground">
+                  Reader loaded, but this chapter is missing
+                </h1>
                 <p className="text-sm text-muted-foreground">
-                  {debugMessage ?? "Debug: The chapter route loaded but the requested chapter record was not found."}
+                  {debugMessage ??
+                    "Debug: The chapter route loaded but the requested chapter record was not found."}
                 </p>
                 {errorMessage && <p className="text-xs text-destructive">{errorMessage}</p>}
               </div>
@@ -483,16 +506,24 @@ function ReaderPage() {
             <h1 className="text-2xl font-extrabold">Chapter {Number(chapter.number)} is locked</h1>
             <p className="text-muted-foreground mt-1">{series.title}</p>
             <div className="my-6 inline-flex items-center gap-2 text-2xl font-extrabold">
-              <Coins className="h-6 w-6 text-[var(--coin)]" /> <span className="shimmer-text">{chapter.price}</span>
+              <Coins className="h-6 w-6 text-[var(--coin)]" />{" "}
+              <span className="shimmer-text">{chapter.price}</span>
             </div>
             {user && (
               <p className="text-sm text-muted-foreground mb-4">
                 Your balance:{" "}
-                <SpringNumber value={wallet?.coins ?? 0} className="font-semibold text-foreground tabular-nums" />
+                <SpringNumber
+                  value={wallet?.coins ?? 0}
+                  className="font-semibold text-foreground tabular-nums"
+                />
               </p>
             )}
             {!user ? (
-              <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={SPRING.snap}>
+              <motion.div
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.97 }}
+                transition={SPRING.snap}
+              >
                 <Button
                   onClick={() => navigate({ to: "/auth" })}
                   className="focus-ring w-full bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-11 shadow-glow"
@@ -501,7 +532,11 @@ function ReaderPage() {
                 </Button>
               </motion.div>
             ) : (
-              <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={SPRING.snap}>
+              <motion.div
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.97 }}
+                transition={SPRING.snap}
+              >
                 <Button
                   onClick={handleUnlock}
                   disabled={unlocking}
@@ -578,7 +613,9 @@ function ReaderPage() {
         className="pointer-events-none fixed top-20 left-1/2 -translate-x-1/2 z-30 inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.18em] text-white/90"
       >
         Chapter {Number(chapter.number)}
-        {pages.length > 0 && <span className="text-white/55">· ~{Math.max(1, Math.ceil(pages.length * 0.4))} min</span>}
+        {pages.length > 0 && (
+          <span className="text-white/55">· ~{Math.max(1, Math.ceil(pages.length * 0.4))} min</span>
+        )}
       </motion.div>
 
       {renderProgressBar()}
@@ -622,7 +659,9 @@ function ReaderPage() {
             pages.map((p, i) => {
               const retryKey = imageRetry[p.id] ?? 0;
               const src =
-                retryKey > 0 ? `${p.image_url}${p.image_url.includes("?") ? "&" : "?"}r=${retryKey}` : p.image_url;
+                retryKey > 0
+                  ? `${p.image_url}${p.image_url.includes("?") ? "&" : "?"}r=${retryKey}`
+                  : p.image_url;
               const failed = failedImages.has(p.id);
               return failed ? (
                 <div
@@ -689,7 +728,9 @@ function ReaderPage() {
               >
                 A−
               </button>
-              <span className="text-xs tabular-nums text-white/70 w-8 text-center">{novelFontSize}</span>
+              <span className="text-xs tabular-nums text-white/70 w-8 text-center">
+                {novelFontSize}
+              </span>
               <button
                 onClick={() => setNovelFontSize((s) => Math.min(28, s + 1))}
                 aria-label="Increase text size"
@@ -712,7 +753,8 @@ function ReaderPage() {
                   <div className="space-y-3">
                     <h2 className="text-lg font-bold text-foreground">No chapter text found</h2>
                     <p className="text-sm text-muted-foreground">
-                      Debug: Chapter ID {chapter.id} loaded, but no <code>content</code> was returned.
+                      Debug: Chapter ID {chapter.id} loaded, but no <code>content</code> was
+                      returned.
                     </p>
                     <Button
                       onClick={() => load()}
@@ -736,7 +778,10 @@ function ReaderPage() {
               size="lg"
               className="haptic bg-aurora text-white border-0 hover:opacity-95 font-bold rounded-full h-12 px-8 shadow-glow"
             >
-              <Link to="/series/$slug/chapter/$number" params={{ slug, number: String(siblings.next) }}>
+              <Link
+                to="/series/$slug/chapter/$number"
+                params={{ slug, number: String(siblings.next) }}
+              >
                 NEXT CHAPTER <ChevronRight className="h-4 w-4" />
               </Link>
             </Button>

@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { SeriesCard } from "@/components/series-card";
 import { LatestUpdateCard } from "@/components/latest-update-card";
@@ -8,22 +7,25 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Play, Sparkles, Flame } from "lucide-react";
 import { GenreBar } from "@/components/genre-bar";
 import { SeriesCardSkeletonRow } from "@/components/series-card-skeleton";
+import { api } from "@/lib/api";
 import { resolveImage, onImageError } from "@/lib/image";
-import {
-  motion, AnimatePresence, SPRING, staggerContainer, staggerItem,
-} from "@/lib/motion";
+import { motion, AnimatePresence, SPRING, staggerContainer, staggerItem } from "@/lib/motion";
 import { useScroll, useTransform, useReducedMotion } from "framer-motion";
 
 type Series = Tables<"series">;
 type Chapter = Tables<"chapters">;
 type LatestEntry = { series: Series; chapters: Chapter[] };
+type SeriesIndexResponse = { data: Series[]; total: number };
 
 export const Route = createFileRoute("/")({
   component: HomePage,
   head: () => ({
     meta: [
       { title: "Nuvia Toon — Read Manga & Novels Online" },
-      { name: "description", content: "Stream the latest manga and novels. New chapters every day." },
+      {
+        name: "description",
+        content: "Stream the latest manga and novels. New chapters every day.",
+      },
     ],
   }),
 });
@@ -39,37 +41,38 @@ function HomePage() {
     (async () => {
       try {
         const [t, p, n, l, settings] = await Promise.all([
-          supabase.from("series").select("*").eq("is_trending", true).limit(5),
-          supabase.from("series").select("*").eq("is_popular", true).eq("type", "manga").limit(12),
-          supabase.from("series").select("*").eq("type", "novel").order("updated_at", { ascending: false }).limit(12),
-          supabase.from("series").select("*").order("updated_at", { ascending: false }).limit(12),
-          supabase.from("site_settings").select("site_name, seo_description").eq("id", true).maybeSingle(),
+          api.get<SeriesIndexResponse>("/series?trending=1&per_page=5"),
+          api.get<SeriesIndexResponse>(
+            "/series?popular=1&type=manga&per_page=12&sort=views&dir=desc",
+          ),
+          api.get<SeriesIndexResponse>("/series?type=novel&per_page=12&sort=updated_at&dir=desc"),
+          api.get<SeriesIndexResponse>("/series?per_page=12&sort=updated_at&dir=desc"),
+          api.get<{ site_name: string; seo_description: string }>("/site-settings"),
         ]);
         setTrending(t.data ?? []);
         setPopular(p.data ?? []);
         setNovels(n.data ?? []);
 
-        if (settings.data && typeof document !== "undefined") {
-          document.title = `${settings.data.site_name} — Read Manga & Novels Online`;
+        if (settings && typeof document !== "undefined") {
+          document.title = `${settings.site_name} — Read Manga & Novels Online`;
           const meta = document.querySelector('meta[name="description"]');
-          if (meta) meta.setAttribute("content", settings.data.seo_description);
+          if (meta) meta.setAttribute("content", settings.seo_description);
         }
 
         const seriesList = l.data ?? [];
         if (seriesList.length) {
-          const ids = seriesList.map((s) => s.id);
-          const { data: ch } = await supabase
-            .from("chapters")
-            .select("*")
-            .in("series_id", ids)
-            .order("number", { ascending: false });
-          const byId = new Map<string, Chapter[]>();
-          (ch ?? []).forEach((c) => {
-            const arr = byId.get(c.series_id) ?? [];
-            if (arr.length < 4) arr.push(c);
-            byId.set(c.series_id, arr);
-          });
-          setLatest(seriesList.map((s) => ({ series: s, chapters: byId.get(s.id) ?? [] })));
+          const latestEntries = await Promise.all(
+            seriesList.map(async (s) => {
+              try {
+                const chapters = await api.get<Chapter[]>(`/series/${s.id}/chapters`);
+                return { series: s, chapters: [...chapters].reverse().slice(0, 4) };
+              } catch (err) {
+                console.error("Failed to load homepage chapters", err);
+                return { series: s, chapters: [] as Chapter[] };
+              }
+            }),
+          );
+          setLatest(latestEntries);
         }
       } catch (err) {
         console.error("Failed to load homepage", err);
@@ -93,7 +96,12 @@ function HomePage() {
         ) : (
           <>
             <LatestUpdatesSection items={latest} />
-            <Section title="Top Rated Manga" icon={<Flame className="h-4 w-4" />} eyebrow="Reader Favorites" items={popular} />
+            <Section
+              title="Top Rated Manga"
+              icon={<Flame className="h-4 w-4" />}
+              eyebrow="Reader Favorites"
+              items={popular}
+            />
             <Section title="Latest Novels" eyebrow="Fresh from the desk" items={novels} />
           </>
         )}
@@ -132,7 +140,10 @@ function SectionHeader({
         </div>
       </div>
       {href && (
-        <Link to={href} className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground hover:text-primary story-link transition-colors duration-300">
+        <Link
+          to={href}
+          className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground hover:text-primary story-link transition-colors duration-300"
+        >
           View All →
         </Link>
       )}
@@ -284,10 +295,13 @@ function Hero({ items, loading }: { items: Series[]; loading?: boolean }) {
               <span className="relative h-1.5 w-1.5 rounded-full bg-primary">
                 <span className="absolute inset-0 rounded-full bg-primary animate-ping" />
               </span>
-              Featured Series · {String(idx + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}
+              Featured Series · {String(idx + 1).padStart(2, "0")} /{" "}
+              {String(items.length).padStart(2, "0")}
             </div>
-            <h1 className="font-bold tracking-tight text-white leading-[0.98] drop-shadow-[0_6px_30px_rgba(0,0,0,0.7)]
-                           text-4xl md:text-6xl lg:text-7xl">
+            <h1
+              className="font-bold tracking-tight text-white leading-[0.98] drop-shadow-[0_6px_30px_rgba(0,0,0,0.7)]
+                           text-4xl md:text-6xl lg:text-7xl"
+            >
               <span className="wordmark not-italic font-bold">{cur.title}</span>
             </h1>
             {cur.author && (
@@ -299,16 +313,31 @@ function Hero({ items, loading }: { items: Series[]; loading?: boolean }) {
               {cur.description}
             </p>
             <div className="flex items-center gap-3 pt-7">
-              <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }} transition={SPRING.snap}>
+              <motion.div
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.96 }}
+                transition={SPRING.snap}
+              >
                 <Button asChild size="lg" variant="premium" className="h-12 px-7 text-sm">
                   <Link to="/series/$slug" params={{ slug: cur.slug }}>
                     <Play className="h-4 w-4 fill-current" /> READ NOW
                   </Link>
                 </Button>
               </motion.div>
-              <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }} transition={SPRING.snap}>
-                <Button asChild variant="outline" size="lg" className="focus-ring glass !bg-white/5 border-white/15 text-white hover:!bg-white/12 hover:text-white font-semibold rounded-full h-12 px-7 text-sm tracking-wider transition-all duration-300">
-                  <Link to="/series/$slug" params={{ slug: cur.slug }}>+ MY LIST</Link>
+              <motion.div
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.96 }}
+                transition={SPRING.snap}
+              >
+                <Button
+                  asChild
+                  variant="outline"
+                  size="lg"
+                  className="focus-ring glass !bg-white/5 border-white/15 text-white hover:!bg-white/12 hover:text-white font-semibold rounded-full h-12 px-7 text-sm tracking-wider transition-all duration-300"
+                >
+                  <Link to="/series/$slug" params={{ slug: cur.slug }}>
+                    + MY LIST
+                  </Link>
                 </Button>
               </motion.div>
             </div>

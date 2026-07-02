@@ -23,15 +23,24 @@ function AuthPage() {
   const [name, setName] = useState("");
 
   const handle = async (mode: "signin" | "signup") => {
-    if (!email || password.length < 6) { toast.error("Email + 6+ char password required"); return; }
+    if (!email || password.length < 6) {
+      toast.error("Email + 6+ char password required");
+      return;
+    }
     setLoading(true);
-    const { error } = mode === "signin"
-      ? await signIn(email, password)
-      : await signUp(email, password, name || email.split("@")[0]);
+    const { error } =
+      mode === "signin"
+        ? await signIn(email, password)
+        : await signUp(email, password, name || email.split("@")[0]);
     setLoading(false);
     if (error) toast.error(error);
-    else if (mode === "signup") toast.success("Check your email to confirm your account!");
-    else { toast.success("Welcome back!"); navigate({ to: "/" }); }
+    else if (mode === "signup") {
+      toast.success("Account created!");
+      navigate({ to: "/" });
+    } else {
+      toast.success("Welcome back!");
+      navigate({ to: "/" });
+    }
   };
 
   const handleGoogle = async () => {
@@ -58,11 +67,15 @@ function AuthPage() {
           disabled={googleLoading || loading}
           onClick={handleGoogle}
         >
-          {googleLoading ? "Connecting…" : "Continue with Google"}
+          {googleLoading ? "Connecting…" : "Google sign-in unavailable"}
         </Button>
         <div className="relative my-5">
-          <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
-          <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or</span></div>
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">or</span>
+          </div>
         </div>
         <Tabs defaultValue="signin">
           <TabsList className="grid w-full grid-cols-2">
@@ -70,18 +83,67 @@ function AuthPage() {
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
           <TabsContent value="signin" className="space-y-4 mt-6">
-            <div className="space-y-2"><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /></div>
-            <div className="space-y-2"><Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-            <Button className="w-full bg-brand text-primary-foreground border-0" disabled={loading} onClick={() => handle("signin")}>{loading ? "..." : "Sign In"}</Button>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <Button
+              className="w-full bg-brand text-primary-foreground border-0"
+              disabled={loading}
+              onClick={() => handle("signin")}
+            >
+              {loading ? "..." : "Sign In"}
+            </Button>
           </TabsContent>
           <TabsContent value="signup" className="space-y-4 mt-6">
-            <div className="space-y-2"><Label>Display name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" /></div>
-            <div className="space-y-2"><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" /></div>
-            <Button className="w-full bg-brand text-primary-foreground border-0" disabled={loading} onClick={() => handle("signup")}>{loading ? "..." : "Create account"}</Button>
+            <div className="space-y-2">
+              <Label>Display name</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 6 characters"
+              />
+            </div>
+            <Button
+              className="w-full bg-brand text-primary-foreground border-0"
+              disabled={loading}
+              onClick={() => handle("signup")}
+            >
+              {loading ? "..." : "Create account"}
+            </Button>
           </TabsContent>
         </Tabs>
-        <p className="text-xs text-center text-muted-foreground mt-6"><Link to="/" className="hover:text-primary">← Back to home</Link></p>
+        <p className="text-xs text-center text-muted-foreground mt-6">
+          <Link to="/" className="hover:text-primary">
+            ← Back to home
+          </Link>
+        </p>
       </div>
     </div>
   );

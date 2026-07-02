@@ -1,10 +1,12 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { Session as SupabaseSession, User as SupabaseUser } from "@supabase/supabase-js";
+import { api, clearAuthToken, getAuthToken, setAuthToken } from "@/lib/api";
 
-// Global fetch interceptor: attach the current Supabase access token to
+// Global fetch interceptor: attach the current Laravel bearer token to
 // internal server-function calls so middleware-protected handlers receive auth.
-if (typeof window !== "undefined" && !(window as unknown as { __sfFetchPatched?: boolean }).__sfFetchPatched) {
+if (
+  typeof window !== "undefined" &&
+  !(window as unknown as { __sfFetchPatched?: boolean }).__sfFetchPatched
+) {
   (window as unknown as { __sfFetchPatched?: boolean }).__sfFetchPatched = true;
   const originalFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {
@@ -18,10 +20,11 @@ if (typeof window !== "undefined" && !(window as unknown as { __sfFetchPatched?:
               ? input.url
               : "";
       if (url.includes("/_serverFn/")) {
-        const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        const headers = new Headers(
+          init?.headers ?? (input instanceof Request ? input.headers : undefined),
+        );
         if (!headers.has("authorization")) {
-          const { data } = await supabase.auth.getSession();
-          const token = data.session?.access_token;
+          const token = getAuthToken();
           if (token) headers.set("Authorization", `Bearer ${token}`);
         }
         return originalFetch(input, { ...init, headers });
@@ -35,11 +38,25 @@ if (typeof window !== "undefined" && !(window as unknown as { __sfFetchPatched?:
 
 export type Role = "user" | "admin" | "super_admin" | "manager";
 
-interface Wallet { coins: number }
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  display_name: string;
+  coin_balance: number;
+}
+
+interface Session {
+  access_token: string;
+}
+
+interface Wallet {
+  coins: number;
+}
 
 interface AuthCtx {
-  user: SupabaseUser | null;
-  session: SupabaseSession | null;
+  user: User | null;
+  session: Session | null;
   wallet: Wallet | null;
   roles: Role[];
   isAdmin: boolean;
@@ -51,7 +68,11 @@ interface AuthCtx {
   canViewAnalytics: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    displayName: string,
+  ) => Promise<{ error: string | null }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshWallet: () => Promise<void>;
@@ -60,87 +81,101 @@ interface AuthCtx {
 const Ctx = createContext<AuthCtx | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [session, setSession] = useState<SupabaseSession | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadUserData = async (userId: string) => {
+  const loadUserData = async (): Promise<boolean> => {
+    const token = getAuthToken();
+    if (!token) {
+      setSession(null);
+      setUser(null);
+      setWallet(null);
+      setRoles([]);
+      return false;
+    }
+
     try {
-      const [walletRes, rolesRes] = await Promise.all([
-        supabase.from("wallets").select("coins").eq("user_id", userId).maybeSingle(),
-        supabase.from("user_roles").select("role").eq("user_id", userId),
+      const [userRes, rolesRes, walletRes] = await Promise.all([
+        api.get<User>("/user"),
+        api.get<{ role: string }[]>("/user/roles"),
+        api.get<{ coins: number }>("/wallet/balance"),
       ]);
-      setWallet({ coins: walletRes.data?.coins ?? 0 });
-      setRoles((rolesRes.data ?? []).map((r) => r.role as Role));
+      setSession({ access_token: token });
+      setUser(userRes);
+      setWallet({ coins: walletRes.coins ?? 0 });
+      setRoles((rolesRes ?? []).map((r) => r.role as Role));
+      return true;
     } catch (err) {
       console.error("Failed to load user data", err);
-      setWallet({ coins: 0 });
+      clearAuthToken();
+      setSession(null);
+      setUser(null);
+      setWallet(null);
       setRoles([]);
+      return false;
     }
   };
 
   useEffect(() => {
-    // Set up listener BEFORE getSession (per Supabase docs).
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-      if (nextSession?.user) {
-        // Defer to avoid deadlock inside the auth callback.
-        setTimeout(() => { void loadUserData(nextSession.user.id); }, 0);
-      } else {
-        setWallet(null);
-        setRoles([]);
-      }
-    });
-
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.user) void loadUserData(s.user.id);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    void loadUserData().finally(() => setLoading(false));
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
-  };
-
-  const signUp = async (email: string, password: string, displayName: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: { display_name: displayName },
-      },
-    });
-    return { error: error?.message ?? null };
-  };
-
-  const signInWithGoogle = async () => {
     try {
-      const { lovable } = await import("@/integrations/lovable/index");
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-      });
-      if (result.error) return { error: result.error.message ?? "Google sign-in failed" };
-      return { error: null };
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : "Google sign-in failed" };
+      const res = await api.post<{ token: string; user?: User }>("/login", { email, password });
+      setAuthToken(res.token);
+      const hydrated = await loadUserData();
+      return hydrated ? { error: null } : { error: "Signed in, but failed to load your session." };
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Sign in failed" };
     }
   };
 
+  const signUp = async (email: string, password: string, displayName: string) => {
+    try {
+      const res = await api.post<{ token: string; user?: User }>("/register", {
+        name: displayName,
+        email,
+        password,
+        password_confirmation: password,
+      });
+      setAuthToken(res.token);
+      const hydrated = await loadUserData();
+      return hydrated ? { error: null } : { error: "Signed up, but failed to load your session." };
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Sign up failed" };
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    return { error: "Google sign-in is not available yet." };
+  };
+
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await api.post("/logout");
+    } catch {
+      // ignore logout failures; local session is cleared below
+    } finally {
+      clearAuthToken();
+      setSession(null);
+      setUser(null);
+      setWallet(null);
+      setRoles([]);
+    }
   };
 
   const refreshWallet = async () => {
-    if (user) await loadUserData(user.id);
+    if (!getAuthToken()) return;
+    try {
+      const walletRes = await api.get<{ coins: number }>("/wallet/balance");
+      setWallet({ coins: walletRes.coins ?? 0 });
+    } catch (err) {
+      console.error("Failed to refresh wallet", err);
+    }
   };
 
   const isSuperAdmin = roles.includes("super_admin");
@@ -152,12 +187,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = isSuperAdmin || isManager || isUploader;
 
   return (
-    <Ctx.Provider value={{
-      user, session, wallet, roles,
-      isAdmin, isSuperAdmin, isManager, isUploader,
-      canManageContent, canManageUsers, canViewAnalytics,
-      loading, signIn, signUp, signInWithGoogle, signOut, refreshWallet,
-    }}>
+    <Ctx.Provider
+      value={{
+        user,
+        session,
+        wallet,
+        roles,
+        isAdmin,
+        isSuperAdmin,
+        isManager,
+        isUploader,
+        canManageContent,
+        canManageUsers,
+        canViewAnalytics,
+        loading,
+        signIn,
+        signUp,
+        signInWithGoogle,
+        signOut,
+        refreshWallet,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );
