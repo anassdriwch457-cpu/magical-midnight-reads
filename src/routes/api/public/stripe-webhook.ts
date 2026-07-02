@@ -72,14 +72,16 @@ async function creditCheckoutSession(sessionId: string) {
   if (readErr) throw new Error(readErr.message);
 
   const newBalance = (existing?.coins ?? 0) + credit;
-  const { error: writeErr } = await supabaseAdmin.from("wallets").upsert(
-    { user_id: userId, coins: newBalance, updated_at: new Date().toISOString() },
-    { onConflict: "user_id" }
-  );
+  const { error: writeErr } = await supabaseAdmin
+    .from("wallets")
+    .upsert(
+      { user_id: userId, coins: newBalance, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" },
+    );
   if (writeErr) throw new Error(writeErr.message);
 
   if (record) {
-    await supabaseAdmin
+    const { error: trackErr } = await supabaseAdmin
       .from("coin_purchase_sessions")
       .update({
         stripe_payment_status: "paid",
@@ -87,8 +89,9 @@ async function creditCheckoutSession(sessionId: string) {
         credited_at: new Date().toISOString(),
       })
       .eq("id", record.id);
+    if (trackErr) console.error("[stripe-webhook] failed to mark session as credited", trackErr);
   } else {
-    await supabaseAdmin.from("coin_purchase_sessions").insert({
+    const { error: insertErr } = await supabaseAdmin.from("coin_purchase_sessions").insert({
       user_id: userId,
       package_id: pkg.id,
       stripe_session_id: session.id,
@@ -98,6 +101,7 @@ async function creditCheckoutSession(sessionId: string) {
       credited_coins: credit,
       credited_at: new Date().toISOString(),
     });
+    if (insertErr) console.error("[stripe-webhook] failed to insert session record", insertErr);
   }
 
   return { ok: true, credited: credit, balance: newBalance };
@@ -106,8 +110,7 @@ async function creditCheckoutSession(sessionId: string) {
 export const Route = createFileRoute("/api/public/stripe-webhook")({
   server: {
     handlers: {
-      OPTIONS: async () =>
-        new Response(null, { status: 204, headers: corsHeaders }),
+      OPTIONS: async () => new Response(null, { status: 204, headers: corsHeaders }),
 
       POST: async ({ request }) => {
         const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -134,11 +137,7 @@ export const Route = createFileRoute("/api/public/stripe-webhook")({
         try {
           const stripe = await getStripe();
           // constructEventAsync uses Web Crypto and works in Workers / edge runtimes.
-          event = await stripe.webhooks.constructEventAsync(
-            rawBody,
-            signature,
-            webhookSecret
-          );
+          event = await stripe.webhooks.constructEventAsync(rawBody, signature, webhookSecret);
         } catch (err) {
           const msg = err instanceof Error ? err.message : "invalid signature";
           console.error("[stripe-webhook] signature verification failed:", msg);
@@ -162,10 +161,12 @@ export const Route = createFileRoute("/api/public/stripe-webhook")({
             }
             case "checkout.session.async_payment_failed": {
               const session = event.data.object as { id: string };
-              await supabaseAdmin
+              const { error: failErr } = await supabaseAdmin
                 .from("coin_purchase_sessions")
                 .update({ stripe_payment_status: "failed" })
                 .eq("stripe_session_id", session.id);
+              if (failErr)
+                console.error("[stripe-webhook] failed to mark session as failed", failErr);
               break;
             }
             default:

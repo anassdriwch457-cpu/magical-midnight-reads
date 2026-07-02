@@ -4,15 +4,23 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Tables } from "@/integrations/supabase/types";
 import {
-  Lock, Coins, Eye, BookOpen, Check, Play, Star, Bookmark, ListOrdered, Clock, ArrowUpDown,
+  Lock,
+  Coins,
+  Eye,
+  BookOpen,
+  Check,
+  Play,
+  Star,
+  Bookmark,
+  ListOrdered,
+  Clock,
+  ArrowUpDown,
 } from "lucide-react";
 import { resolveImage, onImageError } from "@/lib/image";
 import { GenreTag } from "@/components/genre-tag";
 import { BigRecCard } from "@/components/big-rec-card";
 import { Button } from "@/components/ui/button";
-import {
-  motion, AnimatePresence, SPRING, staggerContainer, staggerItem,
-} from "@/lib/motion";
+import { motion, AnimatePresence, SPRING, staggerContainer, staggerItem } from "@/lib/motion";
 import { useScroll, useTransform, useReducedMotion } from "framer-motion";
 
 type Series = Tables<"series">;
@@ -46,33 +54,63 @@ function SeriesDetail() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const { data: s } = await supabase.from("series").select("*").eq("slug", slug).maybeSingle();
-      if (!s) { setNotFoundFlag(true); setLoading(false); return; }
-      setSeries(s);
+      try {
+        const { data: s, error: seriesErr } = await supabase
+          .from("series")
+          .select("*")
+          .eq("slug", slug)
+          .maybeSingle();
+        if (seriesErr) {
+          console.error("[series] failed to fetch series", seriesErr);
+          setNotFoundFlag(true);
+          setLoading(false);
+          return;
+        }
+        if (!s) {
+          setNotFoundFlag(true);
+          setLoading(false);
+          return;
+        }
+        setSeries(s);
 
-      const [chRes, relRes, unlocksRes] = await Promise.all([
-        supabase.from("chapters").select("*").eq("series_id", s.id).order("number", { ascending: true }),
-        supabase.from("series").select("*")
-          .neq("id", s.id)
-          .eq("type", s.type)
-          .order("views", { ascending: false })
-          .limit(6),
-        user
-          ? supabase.from("chapter_unlocks").select("chapter_id").eq("user_id", user.id)
-          : Promise.resolve({ data: [] as { chapter_id: string }[] }),
-      ]);
+        const [chRes, relRes, unlocksRes] = await Promise.all([
+          supabase
+            .from("chapters")
+            .select("*")
+            .eq("series_id", s.id)
+            .order("number", { ascending: true }),
+          supabase
+            .from("series")
+            .select("*")
+            .neq("id", s.id)
+            .eq("type", s.type)
+            .order("views", { ascending: false })
+            .limit(6),
+          user
+            ? supabase.from("chapter_unlocks").select("chapter_id").eq("user_id", user.id)
+            : Promise.resolve({ data: [] as { chapter_id: string }[], error: null }),
+        ]);
 
-      setChapters(chRes.data ?? []);
+        if (chRes.error) console.error("[series] failed to fetch chapters", chRes.error);
+        if (relRes.error) console.error("[series] failed to fetch related series", relRes.error);
+        if (unlocksRes.error) console.error("[series] failed to fetch unlocks", unlocksRes.error);
 
-      let rel = relRes.data ?? [];
-      if (s.genres?.length) {
-        const overlap = rel.filter((r) => r.genres?.some((g) => s.genres.includes(g)));
-        if (overlap.length >= 3) rel = overlap;
+        setChapters(chRes.data ?? []);
+
+        let rel = relRes.data ?? [];
+        if (s.genres?.length) {
+          const overlap = rel.filter((r) => r.genres?.some((g) => s.genres.includes(g)));
+          if (overlap.length >= 3) rel = overlap;
+        }
+        setRelated(rel.slice(0, 6));
+
+        setUnlocked(new Set((unlocksRes.data ?? []).map((x) => x.chapter_id)));
+      } catch (err) {
+        console.error("[series] unexpected error loading series page", err);
+        setNotFoundFlag(true);
+      } finally {
+        setLoading(false);
       }
-      setRelated(rel.slice(0, 6));
-
-      setUnlocked(new Set((unlocksRes.data ?? []).map((x) => x.chapter_id)));
-      setLoading(false);
     })();
   }, [slug, user]);
 
@@ -89,8 +127,12 @@ function SeriesDetail() {
   if (notFoundFlag || !series) throw notFound();
 
   const sortedChapters = order === "asc" ? chapters : [...chapters].reverse();
-  const firstUnreadOrFirst = chapters.find((c) => c.price === 0 || unlocked.has(c.id)) ?? chapters[0];
-  const totalCoins = chapters.reduce((sum, c) => sum + (unlocked.has(c.id) ? 0 : (c.price ?? 0)), 0);
+  const firstUnreadOrFirst =
+    chapters.find((c) => c.price === 0 || unlocked.has(c.id)) ?? chapters[0];
+  const totalCoins = chapters.reduce(
+    (sum, c) => sum + (unlocked.has(c.id) ? 0 : (c.price ?? 0)),
+    0,
+  );
 
   return (
     <div className="pb-24">
@@ -142,8 +184,12 @@ function SeriesDetail() {
               className="space-y-4 pb-2"
             >
               <motion.div variants={staggerItem} className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-aurora text-white text-[10px] font-extrabold uppercase tracking-[0.2em] px-2.5 py-0.5 capitalize">{series.type}</span>
-                <span className="rounded-full glass text-[10px] font-bold uppercase tracking-[0.2em] px-2.5 py-0.5 capitalize text-white/85">{series.status}</span>
+                <span className="rounded-full bg-aurora text-white text-[10px] font-extrabold uppercase tracking-[0.2em] px-2.5 py-0.5 capitalize">
+                  {series.type}
+                </span>
+                <span className="rounded-full glass text-[10px] font-bold uppercase tracking-[0.2em] px-2.5 py-0.5 capitalize text-white/85">
+                  {series.status}
+                </span>
                 {series.is_trending && (
                   <span className="rounded-full bg-primary/20 text-primary text-[10px] font-extrabold uppercase tracking-[0.2em] px-2.5 py-0.5 inline-flex items-center gap-1 ring-1 ring-primary/30">
                     <Star className="h-3 w-3 fill-current" /> Trending
@@ -154,7 +200,9 @@ function SeriesDetail() {
                 variants={staggerItem}
                 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.02]"
               >
-                <span className="wordmark not-italic font-extrabold text-aurora">{series.title}</span>
+                <span className="wordmark not-italic font-extrabold text-aurora">
+                  {series.title}
+                </span>
               </motion.h1>
               {series.author && (
                 <motion.p variants={staggerItem} className="text-sm text-muted-foreground">
@@ -165,29 +213,58 @@ function SeriesDetail() {
                 variants={staggerItem}
                 className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground"
               >
-                <span className="inline-flex items-center gap-1.5"><Eye className="h-4 w-4" /> <span className="font-mono">{series.views.toLocaleString()}</span></span>
-                <span className="inline-flex items-center gap-1.5"><BookOpen className="h-4 w-4" /> <span className="font-mono">{chapters.length}</span> chapters</span>
-                <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4" /> Updated {new Date(series.updated_at).toLocaleDateString()}</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Eye className="h-4 w-4" />{" "}
+                  <span className="font-mono">{series.views.toLocaleString()}</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <BookOpen className="h-4 w-4" />{" "}
+                  <span className="font-mono">{chapters.length}</span> chapters
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock className="h-4 w-4" /> Updated{" "}
+                  {new Date(series.updated_at).toLocaleDateString()}
+                </span>
               </motion.div>
               <motion.div variants={staggerItem} className="flex flex-wrap gap-1.5">
-                {series.genres.map((g) => <GenreTag key={g} name={g} size="sm" />)}
+                {series.genres.map((g) => (
+                  <GenreTag key={g} name={g} size="sm" />
+                ))}
               </motion.div>
-              <motion.p variants={staggerItem} className="text-sm md:text-base leading-relaxed max-w-2xl text-foreground/85">
+              <motion.p
+                variants={staggerItem}
+                className="text-sm md:text-base leading-relaxed max-w-2xl text-foreground/85"
+              >
                 {series.description}
               </motion.p>
 
               <motion.div variants={staggerItem} className="flex flex-wrap gap-3 pt-3">
                 {firstUnreadOrFirst && (
-                  <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }} transition={SPRING.snap}>
+                  <motion.div
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.96 }}
+                    transition={SPRING.snap}
+                  >
                     <Button asChild size="lg" variant="premium" className="h-12 px-7 text-sm">
-                      <Link to="/series/$slug/chapter/$number" params={{ slug: series.slug, number: String(firstUnreadOrFirst.number) }}>
+                      <Link
+                        to="/series/$slug/chapter/$number"
+                        params={{ slug: series.slug, number: String(firstUnreadOrFirst.number) }}
+                      >
                         <Play className="h-4 w-4 fill-current" /> START READING
                       </Link>
                     </Button>
                   </motion.div>
                 )}
-                <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }} transition={SPRING.snap}>
-                  <Button variant="outline" size="lg" className="focus-ring glass !bg-white/5 border-white/20 text-white hover:!bg-white/15 font-extrabold rounded-full h-12 px-7 tracking-wider">
+                <motion.div
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.96 }}
+                  transition={SPRING.snap}
+                >
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="focus-ring glass !bg-white/5 border-white/20 text-white hover:!bg-white/15 font-extrabold rounded-full h-12 px-7 tracking-wider"
+                  >
                     <Bookmark className="h-4 w-4" /> ADD TO LIST
                   </Button>
                 </motion.div>
@@ -248,16 +325,25 @@ function SeriesDetail() {
                     className="group flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-white/5 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className={`grid place-items-center h-8 w-8 rounded-lg shrink-0 text-[10px] font-extrabold tabular-nums tracking-tight transition-all ${
-                        owned ? "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30"
-                              : free ? "bg-white/8 text-white/85 ring-1 ring-white/10"
-                                     : "bg-amber-400/10 text-amber-300 ring-1 ring-amber-400/25"
-                      }`}>
+                      <span
+                        className={`grid place-items-center h-8 w-8 rounded-lg shrink-0 text-[10px] font-extrabold tabular-nums tracking-tight transition-all ${
+                          owned
+                            ? "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30"
+                            : free
+                              ? "bg-white/8 text-white/85 ring-1 ring-white/10"
+                              : "bg-amber-400/10 text-amber-300 ring-1 ring-amber-400/25"
+                        }`}
+                      >
                         {Number(c.number)}
                       </span>
                       <div className="min-w-0">
                         <div className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">
-                          Chapter {Number(c.number)}{c.title ? <span className="font-normal text-muted-foreground"> · {c.title}</span> : ""}
+                          Chapter {Number(c.number)}
+                          {c.title ? (
+                            <span className="font-normal text-muted-foreground"> · {c.title}</span>
+                          ) : (
+                            ""
+                          )}
                         </div>
                         <div className="text-[11px] text-muted-foreground tabular-nums mt-0.5">
                           {new Date(c.created_at).toLocaleDateString()}
@@ -265,7 +351,9 @@ function SeriesDetail() {
                       </div>
                     </div>
                     {free ? (
-                      <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-300/90">Free</span>
+                      <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-300/90">
+                        Free
+                      </span>
                     ) : owned ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-300">
                         <Check className="h-3 w-3" /> Unlocked
@@ -297,10 +385,17 @@ function SeriesDetail() {
               <span className="block h-7 w-1 bg-aurora rounded-full animate-glow-pulse" />
               <div>
                 <div className="eyebrow mb-0.5">You may also love</div>
-                <h2 className="text-xl md:text-2xl font-extrabold tracking-tight uppercase">More Like This</h2>
+                <h2 className="text-xl md:text-2xl font-extrabold tracking-tight uppercase">
+                  More Like This
+                </h2>
               </div>
             </div>
-            <Link to="/browse" className="story-link text-xs font-extrabold uppercase tracking-[0.2em] text-muted-foreground hover:text-primary">View All</Link>
+            <Link
+              to="/browse"
+              className="story-link text-xs font-extrabold uppercase tracking-[0.2em] text-muted-foreground hover:text-primary"
+            >
+              View All
+            </Link>
           </motion.div>
           <motion.div
             variants={staggerContainer(0.06)}
