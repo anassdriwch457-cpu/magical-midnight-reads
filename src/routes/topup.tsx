@@ -1,18 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Coins, Sparkles, Check, Zap, Crown, Star, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { useServerFn } from "@tanstack/react-start";
-import { createCoinCheckout } from "@/server/topup.functions";
 
 const ICONS = [Coins, Star, Zap, Crown];
 
 const PACKAGES = [
   { id: "starter", label: "Starter Pack", coins: 100, bonus: 0, price: 1.0 },
   { id: "popular", label: "Reader Pack", coins: 500, bonus: 50, price: 4.5, popular: true },
-  { id: "value",   label: "Collector Pack", coins: 1200, bonus: 200, price: 9.99 },
+  { id: "value", label: "Collector Pack", coins: 1200, bonus: 200, price: 9.99 },
   { id: "ultimate", label: "Legend Pack", coins: 3500, bonus: 750, price: 24.99 },
 ];
 
@@ -28,7 +27,6 @@ export const Route = createFileRoute("/topup")({
 
 function TopupPage() {
   const { user, wallet } = useAuth();
-  const checkout = useServerFn(createCoinCheckout);
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   const handleBuy = async (packageId: string) => {
@@ -38,8 +36,10 @@ function TopupPage() {
     }
     setPendingId(packageId);
     try {
-      const { url } = await checkout({ data: { packageId } });
-      if (url) window.location.href = url;
+      const res = await api.post<{ url: string; sessionId: string }>("/stripe/checkout", {
+        packageId,
+      });
+      if (res.url) window.location.href = res.url;
       else toast.error("Could not start checkout");
     } catch (e) {
       console.error(e);
@@ -54,7 +54,8 @@ function TopupPage() {
         <Sparkles className="mx-auto h-10 w-10 text-primary mb-3" />
         <h1 className="text-4xl md:text-5xl font-bold text-brand">Top Up Coins</h1>
         <p className="text-muted-foreground mt-2 max-w-xl mx-auto">
-          Coins unlock premium chapters across Nuvia Toon — permanently. No subscriptions, no expiry.
+          Coins unlock premium chapters across Nuvia Toon — permanently. No subscriptions, no
+          expiry.
         </p>
         {user && (
           <div className="inline-flex items-center gap-2 mt-5 rounded-full border border-border bg-card px-4 py-2">
@@ -99,9 +100,13 @@ function TopupPage() {
                   )}
 
                   <Icon className="h-9 w-9 text-[var(--coin)] mb-3" />
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground font-bold">{p.label}</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground font-bold">
+                    {p.label}
+                  </div>
                   <div className="mt-1 flex items-baseline gap-1">
-                    <span className="text-3xl font-bold tabular-nums">{total.toLocaleString()}</span>
+                    <span className="text-3xl font-bold tabular-nums">
+                      {total.toLocaleString()}
+                    </span>
                     <span className="text-xs text-muted-foreground">coins</span>
                   </div>
                   {p.bonus > 0 && (
@@ -132,7 +137,10 @@ function TopupPage() {
               { icon: ShieldCheck, t: "Secure checkout powered by Stripe" },
               { icon: Sparkles, t: "Coins credited automatically after payment" },
             ].map(({ icon: I, t }) => (
-              <div key={t} className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3">
+              <div
+                key={t}
+                className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3"
+              >
                 <I className="h-4 w-4 text-primary" />
                 <span className="text-muted-foreground">{t}</span>
               </div>
@@ -140,8 +148,8 @@ function TopupPage() {
           </div>
 
           <p className="text-xs text-center text-muted-foreground mt-6">
-            You'll be redirected to Stripe to complete your purchase. Coins are credited to your
-            wallet only after successful payment.
+            You&apos;ll be redirected to Stripe to complete your purchase. Coins are credited to
+            your wallet only after successful payment.
           </p>
         </>
       )}
