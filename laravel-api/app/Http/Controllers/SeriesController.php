@@ -52,7 +52,7 @@ class SeriesController extends Controller
             });
         }
         if ($request->filled('q')) {
-            $q = $request->string('q')->toString();
+            $q = str_replace(['%', '_'], ['\%', '\_'], $request->string('q')->toString());
             $query->where('title', 'like', '%' . $q . '%');
         }
 

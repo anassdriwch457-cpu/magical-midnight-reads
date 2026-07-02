@@ -22,15 +22,10 @@ export default defineConfig({
   cloudflare: isStandaloneBuild ? false : undefined,
   vite: {
     plugins: isNetlifyBuild ? [netlify()] : [],
-    // Allow any host header in dev/preview (covers sslip.io, custom domains,
-    // tunnels, Coolify ingress, etc.). Vite blocks unknown Host headers by
-    // default since v5.
     server: {
-      allowedHosts: true,
       host: true,
     },
     preview: {
-      allowedHosts: true,
       host: true,
       port: Number(process.env.PORT) || 3000,
     },

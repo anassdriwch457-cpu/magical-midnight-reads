@@ -7,8 +7,10 @@ use App\Http\Controllers\StripeController;
 use App\Http\Controllers\UnlockChapterController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::middleware('throttle:5,1')->group(function (): void {
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
+});
 
 Route::get('/series', [SeriesController::class, 'index']);
 Route::get('/series/{series}', [SeriesController::class, 'show']);
@@ -16,7 +18,6 @@ Route::get('/series/{series}/chapters', [ChapterController::class, 'bySeries']);
 Route::get('/chapters/{chapter}/pages', [ChapterController::class, 'pages']);
 Route::get('/site-settings', [SeriesController::class, 'siteSettings']);
 
-Route::post('/verify-checkout', [StripeController::class, 'verifyCheckout']);
 Route::post('/stripe/webhook', [StripeController::class, 'webhook']);
 
 Route::middleware('auth:sanctum')->group(function (): void {
@@ -27,4 +28,5 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/user/unlocks', [UnlockChapterController::class, 'index']);
     Route::post('/unlock-chapter', [UnlockChapterController::class, 'store']);
     Route::post('/chapters/{chapter}/unlock', [UnlockChapterController::class, 'storeByPath']);
+    Route::post('/verify-checkout', [StripeController::class, 'verifyCheckout']);
 });
