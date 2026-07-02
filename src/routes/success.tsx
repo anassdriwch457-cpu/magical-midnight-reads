@@ -1,12 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Coins, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { verifyCoinCheckout } from "@/server/topup.functions";
 import { SparkleBurst } from "@/components/sparkle-burst";
 
 const SearchSchema = z.object({
@@ -31,7 +30,6 @@ function SuccessPage() {
   const { session_id } = Route.useSearch();
   const { session, refreshWallet } = useAuth();
   const navigate = useNavigate();
-  const verify = useServerFn(verifyCoinCheckout);
   const ranRef = useRef(false);
 
   const [status, setStatus] = useState<Status>("verifying");
@@ -47,14 +45,19 @@ function SuccessPage() {
       setErrorMsg("Missing session id");
       return;
     }
-    if (!session?.access_token) return; // wait for auth to hydrate
+    if (!session?.access_token) return;
     ranRef.current = true;
 
     (async () => {
       try {
-        const res = await verify({
-          data: { sessionId: session_id },
-          headers: { Authorization: `Bearer ${session.access_token}` },
+        const res = await api.post<{
+          paid: boolean;
+          status: string;
+          credited: number;
+          balance?: number;
+          alreadyCredited?: boolean;
+        }>("/verify-checkout", {
+          sessionId: session_id,
         });
         if (!res.paid) {
           setStatus("pending");
@@ -73,7 +76,7 @@ function SuccessPage() {
         setErrorMsg(e instanceof Error ? e.message : "Verification failed");
       }
     })();
-  }, [session_id, session?.access_token, verify, refreshWallet]);
+  }, [session_id, session?.access_token, refreshWallet]);
 
   return (
     <div className="container mx-auto px-4 py-16 max-w-xl">
@@ -84,7 +87,7 @@ function SuccessPage() {
             <Loader2 className="mx-auto h-10 w-10 text-primary animate-spin mb-4" />
             <h1 className="text-2xl font-bold mb-2">Confirming your payment…</h1>
             <p className="text-muted-foreground">
-              Please don't close this page. We're verifying with Stripe.
+              Please don&apos;t close this page. We&apos;re verifying with Stripe.
             </p>
           </>
         )}
@@ -121,8 +124,8 @@ function SuccessPage() {
             <Loader2 className="mx-auto h-10 w-10 text-yellow-500 mb-4" />
             <h1 className="text-2xl font-bold mb-2">Payment pending</h1>
             <p className="text-muted-foreground">
-              Stripe hasn't confirmed your payment yet. Refresh this page in a moment, or check back
-              later — coins will be credited automatically once payment clears.
+              Stripe hasn&apos;t confirmed your payment yet. Refresh this page in a moment, or check
+              back later — coins will be credited automatically once payment clears.
             </p>
             <div className="mt-6 flex justify-center gap-3">
               <Button onClick={() => window.location.reload()}>Refresh</Button>
@@ -136,7 +139,7 @@ function SuccessPage() {
         {status === "error" && (
           <>
             <XCircle className="mx-auto h-10 w-10 text-destructive mb-4" />
-            <h1 className="text-2xl font-bold mb-2">Couldn't verify payment</h1>
+            <h1 className="text-2xl font-bold mb-2">Couldn&apos;t verify payment</h1>
             <p className="text-muted-foreground">{errorMsg ?? "Unknown error"}</p>
             <div className="mt-6 flex justify-center gap-3">
               <Button asChild variant="outline">
