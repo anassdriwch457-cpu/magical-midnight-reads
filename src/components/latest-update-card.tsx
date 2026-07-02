@@ -1,27 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { Coins, Sparkles } from "lucide-react";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Series as FullSeries, Chapter as FullChapter } from "@/lib/types";
 import { resolveImage, onImageError } from "@/lib/image";
+import { timeAgo } from "@/lib/date";
 import { motion, SPRING, useReducedMotion } from "@/lib/motion";
 
-type Series = Pick<Tables<"series">, "id" | "slug" | "title" | "cover_url" | "type">;
-type Chapter = Pick<Tables<"chapters">, "id" | "number" | "price" | "created_at">;
-
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
-  const w = Math.floor(d / 7);
-  if (w < 5) return `${w}w ago`;
-  const mo = Math.floor(d / 30);
-  if (mo < 12) return `${mo}mo ago`;
-  return `${Math.floor(d / 365)}y ago`;
-}
+type Series = Pick<FullSeries, "id" | "slug" | "title" | "cover_url" | "type">;
+type Chapter = Pick<FullChapter, "id" | "number" | "price" | "created_at">;
 
 export function LatestUpdateCard({
   series,
