@@ -43,7 +43,7 @@ async function fetchHtml(url: string): Promise<string> {
   return res.text();
 }
 
-function decode(s: string): string {
+export function decode(s: string): string {
   return s
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -56,7 +56,7 @@ function decode(s: string): string {
     .trim();
 }
 
-function abs(href: string): string {
+export function abs(href: string): string {
   if (!href) return href;
   if (href.startsWith("http")) return href;
   if (href.startsWith("//")) return `https:${href}`;

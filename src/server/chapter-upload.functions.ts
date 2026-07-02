@@ -17,7 +17,7 @@ async function assertStaff(userId: string) {
   if (!ok) throw new Error("Insufficient privileges");
 }
 
-function extFromContentType(ct: string): string {
+export function extFromContentType(ct: string): string {
   if (ct.includes("png")) return "png";
   if (ct.includes("webp")) return "webp";
   if (ct.includes("gif")) return "gif";
@@ -30,7 +30,7 @@ function extFromContentType(ct: string): string {
  * - Gofile direct links pass through (admin must use the "Direct Link" from gofile)
  * - Any other absolute http(s) URL passes through.
  */
-function normalizeUrl(raw: string): string {
+export function normalizeUrl(raw: string): string {
   const url = raw.trim();
   if (!url) return "";
 

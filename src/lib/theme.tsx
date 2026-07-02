@@ -14,7 +14,7 @@ type Ctx = {
 const ThemeCtx = createContext<Ctx | null>(null);
 
 /** Convert hex (#rrggbb) to oklch components string "L C H" (no alpha). */
-function hexToOklch(hex: string): { l: number; c: number; h: number } {
+export function hexToOklch(hex: string): { l: number; c: number; h: number } {
   const m = hex.replace("#", "");
   const r = parseInt(m.substring(0, 2), 16) / 255;
   const g = parseInt(m.substring(2, 4), 16) / 255;
