@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import type { Chapter as ChapterRow, Series } from "@/lib/types";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,9 +24,8 @@ import { SparkleBurst } from "@/components/sparkle-burst";
 import { motion, SPRING, SpringNumber } from "@/lib/motion";
 import { resolveImage, PLACEHOLDER_COVER } from "@/lib/image";
 
-type Chapter = Omit<Tables<"chapters">, "content">;
+type Chapter = Omit<ChapterRow, "content">;
 type Page = Tables<"chapter_pages">;
-type Series = Tables<"series">;
 
 function normalizePages(rows: Page[]): Page[] {
   return rows.map((p) => ({ ...p, image_url: resolveImage(p.image_url) }));

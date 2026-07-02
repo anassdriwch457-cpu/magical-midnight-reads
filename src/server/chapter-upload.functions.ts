@@ -2,27 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-
-const BUCKET = "chapter-images";
-
-async function assertStaff(userId: string) {
-  const { data: roles, error } = await supabaseAdmin
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
-  if (error) throw new Error(error.message);
-  const ok = (roles ?? []).some(
-    (r) => r.role === "admin" || r.role === "super_admin" || r.role === "manager",
-  );
-  if (!ok) throw new Error("Insufficient privileges");
-}
-
-function extFromContentType(ct: string): string {
-  if (ct.includes("png")) return "png";
-  if (ct.includes("webp")) return "webp";
-  if (ct.includes("gif")) return "gif";
-  return "jpg";
-}
+import { assertStaff, extFromContentType, CHAPTER_IMAGES_BUCKET } from "@/server/shared";
 
 /**
  * Convert a user-pasted URL into a direct download URL.
@@ -128,10 +108,10 @@ export const uploadChapterFromUrls = createServerFn({ method: "POST" })
           pageNum,
         ).padStart(4, "0")}.${ext}`;
         const { error: upErr } = await supabaseAdmin.storage
-          .from(BUCKET)
+          .from(CHAPTER_IMAGES_BUCKET)
           .upload(path, bytes, { contentType, upsert: true, cacheControl: "31536000" });
         if (upErr) throw new Error(upErr.message);
-        const { data: pub } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);
+        const { data: pub } = supabaseAdmin.storage.from(CHAPTER_IMAGES_BUCKET).getPublicUrl(path);
         const { error: insErr } = await supabaseAdmin.from("chapter_pages").insert({
           chapter_id: chapterId,
           page_number: pageNum,

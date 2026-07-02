@@ -1,14 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Series } from "@/lib/types";
 import { SeriesCard } from "@/components/series-card";
 import { Button } from "@/components/ui/button";
 import { GenreBar } from "@/components/genre-bar";
 import { EmptyState } from "@/components/empty-state";
 import { SearchX } from "lucide-react";
 
-type Series = Tables<"series">;
 const PAGE_SIZE = 18;
 const GENRES = ["All", "Action", "Fantasy", "Romance", "Adventure", "Magic", "Drama", "Mystery", "Supernatural", "School Life"];
 const TYPES = [{ k: "all", l: "All" }, { k: "manga", l: "Manga" }, { k: "novel", l: "Novel" }] as const;

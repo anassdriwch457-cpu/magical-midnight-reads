@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Series, Chapter } from "@/lib/types";
 import { SeriesCard } from "@/components/series-card";
 import { LatestUpdateCard } from "@/components/latest-update-card";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,6 @@ import {
 } from "@/lib/motion";
 import { useScroll, useTransform, useReducedMotion } from "framer-motion";
 
-type Series = Tables<"series">;
-type Chapter = Tables<"chapters">;
 type LatestEntry = { series: Series; chapters: Chapter[] };
 
 export const Route = createFileRoute("/")({

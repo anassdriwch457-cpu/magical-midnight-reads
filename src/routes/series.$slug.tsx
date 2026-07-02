@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet, notFound, useLocation } from "@tanstack/
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Series, Chapter } from "@/lib/types";
 import {
   Lock, Coins, Eye, BookOpen, Check, Play, Star, Bookmark, ListOrdered, Clock, ArrowUpDown,
 } from "lucide-react";
@@ -14,9 +14,6 @@ import {
   motion, AnimatePresence, SPRING, staggerContainer, staggerItem,
 } from "@/lib/motion";
 import { useScroll, useTransform, useReducedMotion } from "framer-motion";
-
-type Series = Tables<"series">;
-type Chapter = Tables<"chapters">;
 
 export const Route = createFileRoute("/series/$slug")({
   component: SeriesDetail,

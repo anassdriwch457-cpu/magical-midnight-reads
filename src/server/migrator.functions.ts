@@ -8,48 +8,9 @@ import {
   downloadImage,
   type ScrapedSeries,
 } from "./scrapers/mangago";
-
-/* ============================== AUTH ============================== */
-
-async function assertStaff(userId: string) {
-  const { data: roles, error } = await supabaseAdmin
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
-  if (error) throw new Error(error.message);
-  const ok = (roles ?? []).some(
-    (r) => r.role === "admin" || r.role === "super_admin" || r.role === "manager",
-  );
-  if (!ok) throw new Error("Insufficient privileges");
-}
+import { assertStaff, extFromContentType, uploadToStorage } from "@/server/shared";
 
 /* ============================== HELPERS ============================== */
-
-const BUCKET = "chapter-images";
-
-async function uploadBytes(
-  path: string,
-  bytes: Uint8Array,
-  contentType: string,
-): Promise<string> {
-  const { error } = await supabaseAdmin.storage
-    .from(BUCKET)
-    .upload(path, bytes, {
-      contentType,
-      upsert: true,
-      cacheControl: "31536000",
-    });
-  if (error) throw new Error(`Upload failed: ${error.message}`);
-  const { data } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
-}
-
-function extFromContentType(ct: string): string {
-  if (ct.includes("png")) return "png";
-  if (ct.includes("webp")) return "webp";
-  if (ct.includes("gif")) return "gif";
-  return "jpg";
-}
 
 async function appendLog(jobId: string, line: string) {
   const { data: row } = await supabaseAdmin
@@ -201,7 +162,7 @@ export const runImportStep = createServerFn({ method: "POST" })
                 job.source_url,
               );
               const ext = extFromContentType(contentType);
-              coverPublicUrl = await uploadBytes(
+              coverPublicUrl = await uploadToStorage(
                 `import/${scraped.slug}/cover.${ext}`,
                 bytes,
                 contentType,
@@ -350,7 +311,7 @@ export const runImportStep = createServerFn({ method: "POST" })
               4,
               "0",
             )}.${ext}`;
-            const publicUrl = await uploadBytes(path, bytes, contentType);
+            const publicUrl = await uploadToStorage(path, bytes, contentType);
             await supabaseAdmin.from("chapter_pages").insert({
               chapter_id: next.id,
               page_number: pageNum,
