@@ -4,7 +4,10 @@ import type { Session as SupabaseSession, User as SupabaseUser } from "@supabase
 
 // Global fetch interceptor: attach the current Supabase access token to
 // internal server-function calls so middleware-protected handlers receive auth.
-if (typeof window !== "undefined" && !(window as unknown as { __sfFetchPatched?: boolean }).__sfFetchPatched) {
+if (
+  typeof window !== "undefined" &&
+  !(window as unknown as { __sfFetchPatched?: boolean }).__sfFetchPatched
+) {
   (window as unknown as { __sfFetchPatched?: boolean }).__sfFetchPatched = true;
   const originalFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {
@@ -18,7 +21,9 @@ if (typeof window !== "undefined" && !(window as unknown as { __sfFetchPatched?:
               ? input.url
               : "";
       if (url.includes("/_serverFn/")) {
-        const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        const headers = new Headers(
+          init?.headers ?? (input instanceof Request ? input.headers : undefined),
+        );
         if (!headers.has("authorization")) {
           const { data } = await supabase.auth.getSession();
           const token = data.session?.access_token;
@@ -35,7 +40,9 @@ if (typeof window !== "undefined" && !(window as unknown as { __sfFetchPatched?:
 
 export type Role = "user" | "admin" | "super_admin" | "manager";
 
-interface Wallet { coins: number }
+interface Wallet {
+  coins: number;
+}
 
 interface AuthCtx {
   user: SupabaseUser | null;
@@ -51,7 +58,11 @@ interface AuthCtx {
   canViewAnalytics: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    displayName: string,
+  ) => Promise<{ error: string | null }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshWallet: () => Promise<void>;
@@ -72,10 +83,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase.from("wallets").select("coins").eq("user_id", userId).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", userId),
       ]);
+      if (walletRes.error) console.error("[auth] failed to load wallet", walletRes.error);
+      if (rolesRes.error) console.error("[auth] failed to load roles", rolesRes.error);
       setWallet({ coins: walletRes.data?.coins ?? 0 });
-      setRoles((rolesRes.data ?? []).map((r) => r.role as Role));
+      setRoles(rolesRes.error ? [] : (rolesRes.data ?? []).map((r) => r.role as Role));
     } catch (err) {
-      console.error("Failed to load user data", err);
+      console.error("[auth] failed to load user data", err);
       setWallet({ coins: 0 });
       setRoles([]);
     }
@@ -83,12 +96,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Set up listener BEFORE getSession (per Supabase docs).
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       if (nextSession?.user) {
         // Defer to avoid deadlock inside the auth callback.
-        setTimeout(() => { void loadUserData(nextSession.user.id); }, 0);
+        setTimeout(() => {
+          void loadUserData(nextSession.user.id);
+        }, 0);
       } else {
         setWallet(null);
         setRoles([]);
@@ -152,12 +169,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = isSuperAdmin || isManager || isUploader;
 
   return (
-    <Ctx.Provider value={{
-      user, session, wallet, roles,
-      isAdmin, isSuperAdmin, isManager, isUploader,
-      canManageContent, canManageUsers, canViewAnalytics,
-      loading, signIn, signUp, signInWithGoogle, signOut, refreshWallet,
-    }}>
+    <Ctx.Provider
+      value={{
+        user,
+        session,
+        wallet,
+        roles,
+        isAdmin,
+        isSuperAdmin,
+        isManager,
+        isUploader,
+        canManageContent,
+        canManageUsers,
+        canViewAnalytics,
+        loading,
+        signIn,
+        signUp,
+        signInWithGoogle,
+        signOut,
+        refreshWallet,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );

@@ -125,8 +125,7 @@ export async function scrapeMangagoSeries(seriesUrl: string): Promise<ScrapedSer
     /<table class="listing"[^>]*id="chapter_table"[^>]*>([\s\S]*?)<\/table>/,
   );
   const tableHtml = tableMatch ? tableMatch[1] : html;
-  const chRe =
-    /<a class="chico"[^>]*href="([^"]+)"[^>]*>\s*(?:<b[^>]*>([^<]*)<\/b>)?\s*([^<]*)/g;
+  const chRe = /<a class="chico"[^>]*href="([^"]+)"[^>]*>\s*(?:<b[^>]*>([^<]*)<\/b>)?\s*([^<]*)/g;
   let cm: RegExpExecArray | null;
   const seen = new Set<string>();
   while ((cm = chRe.exec(tableHtml)) !== null) {
@@ -196,6 +195,7 @@ export async function scrapeMangagoChapterImages(chapterUrl: string): Promise<st
   collectFromHtml(firstHtml);
 
   // Step by 2 since each page yields 2 images.
+  const failedPages: number[] = [];
   for (let p = 3; p <= totalPages; p += 2) {
     try {
       const html = await fetchHtml(`${base}pg-${p}/`);
@@ -204,7 +204,14 @@ export async function scrapeMangagoChapterImages(chapterUrl: string): Promise<st
       await new Promise((r) => setTimeout(r, 150));
     } catch (err) {
       console.error(`[mangago] failed pg-${p}`, err);
+      failedPages.push(p);
     }
+  }
+
+  if (failedPages.length > 0) {
+    console.warn(
+      `[mangago] ${failedPages.length}/${Math.ceil(totalPages / 2)} reader pages failed: ${failedPages.join(", ")}`,
+    );
   }
 
   return collected;

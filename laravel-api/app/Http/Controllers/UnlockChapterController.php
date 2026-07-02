@@ -7,6 +7,7 @@ use App\Models\ChapterUnlock;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class UnlockChapterController extends Controller
 {
@@ -81,6 +82,17 @@ class UnlockChapterController extends Controller
                 'success' => false,
                 'error' => 'Insufficient coins',
             ]);
+        } catch (\Throwable $e) {
+            Log::error('[unlock] transaction failed', [
+                'chapter_id' => $chapter->id,
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to unlock chapter, please try again',
+            ], 500);
         }
 
         $user->refresh();

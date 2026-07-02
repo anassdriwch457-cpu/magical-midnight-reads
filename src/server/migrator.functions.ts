@@ -27,18 +27,12 @@ async function assertStaff(userId: string) {
 
 const BUCKET = "chapter-images";
 
-async function uploadBytes(
-  path: string,
-  bytes: Uint8Array,
-  contentType: string,
-): Promise<string> {
-  const { error } = await supabaseAdmin.storage
-    .from(BUCKET)
-    .upload(path, bytes, {
-      contentType,
-      upsert: true,
-      cacheControl: "31536000",
-    });
+async function uploadBytes(path: string, bytes: Uint8Array, contentType: string): Promise<string> {
+  const { error } = await supabaseAdmin.storage.from(BUCKET).upload(path, bytes, {
+    contentType,
+    upsert: true,
+    cacheControl: "31536000",
+  });
   if (error) throw new Error(`Upload failed: ${error.message}`);
   const { data } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
@@ -52,15 +46,23 @@ function extFromContentType(ct: string): string {
 }
 
 async function appendLog(jobId: string, line: string) {
-  const { data: row } = await supabaseAdmin
+  const { data: row, error: readErr } = await supabaseAdmin
     .from("import_jobs")
     .select("logs")
     .eq("id", jobId)
     .maybeSingle();
+  if (readErr) {
+    console.error("[migrator] appendLog read failed", readErr);
+    return;
+  }
   const logs = [...((row?.logs as string[]) ?? []), `${new Date().toISOString()} ${line}`].slice(
     -200,
   );
-  await supabaseAdmin.from("import_jobs").update({ logs }).eq("id", jobId);
+  const { error: writeErr } = await supabaseAdmin
+    .from("import_jobs")
+    .update({ logs })
+    .eq("id", jobId);
+  if (writeErr) console.error("[migrator] appendLog write failed", writeErr);
 }
 
 type JobPatch = Partial<{
@@ -73,7 +75,8 @@ type JobPatch = Partial<{
 }>;
 
 async function setJob(jobId: string, patch: JobPatch) {
-  await supabaseAdmin.from("import_jobs").update(patch).eq("id", jobId);
+  const { error } = await supabaseAdmin.from("import_jobs").update(patch).eq("id", jobId);
+  if (error) console.error("[migrator] setJob failed", error);
 }
 
 /* ============================== CREATE JOB ============================== */
@@ -196,10 +199,7 @@ export const runImportStep = createServerFn({ method: "POST" })
           let coverPublicUrl: string | null = null;
           if (scraped.coverUrl) {
             try {
-              const { bytes, contentType } = await downloadImage(
-                scraped.coverUrl,
-                job.source_url,
-              );
+              const { bytes, contentType } = await downloadImage(scraped.coverUrl, job.source_url);
               const ext = extFromContentType(contentType);
               coverPublicUrl = await uploadBytes(
                 `import/${scraped.slug}/cover.${ext}`,
@@ -255,18 +255,27 @@ export const runImportStep = createServerFn({ method: "POST" })
             .eq("number", ch.number)
             .maybeSingle();
           if (!existingCh) {
-            await supabaseAdmin.from("chapters").insert({
+            const { error: chInsErr } = await supabaseAdmin.from("chapters").insert({
               series_id: seriesId,
               number: ch.number,
               title: ch.title,
               price: 0,
               source_url: ch.sourceUrl,
             });
+            if (chInsErr) {
+              await appendLog(jobId, `Failed to insert Ch.${ch.number}: ${chInsErr.message}`);
+            }
           } else if (ch.sourceUrl) {
-            await supabaseAdmin
+            const { error: chUpdErr } = await supabaseAdmin
               .from("chapters")
               .update({ source_url: ch.sourceUrl })
               .eq("id", existingCh.id);
+            if (chUpdErr) {
+              await appendLog(
+                jobId,
+                `Failed to update Ch.${ch.number} source_url: ${chUpdErr.message}`,
+              );
+            }
           }
         }
 

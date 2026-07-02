@@ -99,6 +99,7 @@ export const createCoinCheckout = createServerFn({ method: "POST" })
     });
     if (insertErr) {
       console.error("[topup] failed to record pending session", insertErr);
+      throw new Error(`Failed to record checkout session: ${insertErr.message}`);
     }
 
     return { url: session.url, sessionId: session.id };
@@ -142,10 +143,11 @@ export const verifyCoinCheckout = createServerFn({ method: "POST" })
 
     if (!paid) {
       if (record) {
-        await supabaseAdmin
+        const { error: statusErr } = await supabaseAdmin
           .from("coin_purchase_sessions")
           .update({ stripe_payment_status: session.payment_status ?? "unpaid" })
           .eq("id", record.id);
+        if (statusErr) console.error("[topup] failed to update session status", statusErr);
       }
       return {
         paid: false,
@@ -185,12 +187,12 @@ export const verifyCoinCheckout = createServerFn({ method: "POST" })
       .from("wallets")
       .upsert(
         { user_id: userId, coins: newBalance, updated_at: new Date().toISOString() },
-        { onConflict: "user_id" }
+        { onConflict: "user_id" },
       );
     if (writeErr) throw new Error(writeErr.message);
 
     if (record) {
-      await supabaseAdmin
+      const { error: trackErr } = await supabaseAdmin
         .from("coin_purchase_sessions")
         .update({
           stripe_payment_status: "paid",
@@ -198,9 +200,9 @@ export const verifyCoinCheckout = createServerFn({ method: "POST" })
           credited_at: new Date().toISOString(),
         })
         .eq("id", record.id);
+      if (trackErr) console.error("[topup] failed to mark session as credited", trackErr);
     } else {
-      // Fallback if the pending row wasn't recorded for some reason.
-      await supabaseAdmin.from("coin_purchase_sessions").insert({
+      const { error: fallbackErr } = await supabaseAdmin.from("coin_purchase_sessions").insert({
         user_id: userId,
         package_id: pkg.id,
         stripe_session_id: session.id,
@@ -210,6 +212,8 @@ export const verifyCoinCheckout = createServerFn({ method: "POST" })
         credited_coins: credit,
         credited_at: new Date().toISOString(),
       });
+      if (fallbackErr)
+        console.error("[topup] failed to insert fallback session record", fallbackErr);
     }
 
     return {

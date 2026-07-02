@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class StripeController extends Controller
@@ -38,20 +39,33 @@ class StripeController extends Controller
         $credited = 0;
 
         if (!$alreadyCredited) {
-            DB::transaction(function () use ($tx, &$credited): void {
-                $transaction = PaymentTransaction::query()->lockForUpdate()->findOrFail($tx->id);
-                if ($transaction->credited_at !== null) {
-                    return;
-                }
+            try {
+                DB::transaction(function () use ($tx, &$credited): void {
+                    $transaction = PaymentTransaction::query()->lockForUpdate()->findOrFail($tx->id);
+                    if ($transaction->credited_at !== null) {
+                        return;
+                    }
 
-                $user = User::query()->lockForUpdate()->findOrFail($transaction->user_id);
-                $coins = (int) $transaction->coins;
-                $user->increment('coin_balance', $coins);
-                $transaction->update([
-                    'credited_at' => now(),
+                    $user = User::query()->lockForUpdate()->findOrFail($transaction->user_id);
+                    $coins = (int) $transaction->coins;
+                    $user->increment('coin_balance', $coins);
+                    $transaction->update([
+                        'credited_at' => now(),
+                    ]);
+                    $credited = $coins;
+                });
+            } catch (\Throwable $e) {
+                Log::error('[stripe] verifyCheckout transaction failed', [
+                    'session_id' => $sessionId,
+                    'error' => $e->getMessage(),
                 ]);
-                $credited = $coins;
-            });
+
+                return response()->json([
+                    'paid' => true,
+                    'credited' => 0,
+                    'error' => 'Failed to credit coins, please try again',
+                ], 500);
+            }
         }
 
         $user = User::query()->find($tx->user_id);
@@ -80,6 +94,10 @@ class StripeController extends Controller
         try {
             $event = \Stripe\Webhook::constructEvent($payload, $signature, $secret);
         } catch (\Throwable $e) {
+            Log::warning('[stripe-webhook] signature verification failed', [
+                'error' => $e->getMessage(),
+            ]);
+
             return response('Invalid payload', 400);
         }
 
@@ -93,16 +111,25 @@ class StripeController extends Controller
             $amount = (int) ($session->amount_total ?? 0);
 
             if ($sessionId && $userId) {
-                PaymentTransaction::updateOrCreate(
-                    ['session_id' => $sessionId],
-                    [
-                        'provider' => 'stripe',
-                        'user_id' => $userId,
-                        'amount_cents' => $amount,
-                        'coins' => max(0, $coins),
-                        'status' => $status === 'paid' ? 'paid' : 'pending',
-                    ]
-                );
+                try {
+                    PaymentTransaction::updateOrCreate(
+                        ['session_id' => $sessionId],
+                        [
+                            'provider' => 'stripe',
+                            'user_id' => $userId,
+                            'amount_cents' => $amount,
+                            'coins' => max(0, $coins),
+                            'status' => $status === 'paid' ? 'paid' : 'pending',
+                        ]
+                    );
+                } catch (\Throwable $e) {
+                    Log::error('[stripe-webhook] failed to record transaction', [
+                        'session_id' => $sessionId,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    return response('Failed to record transaction', 500);
+                }
             }
         }
 
