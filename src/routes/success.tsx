@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Coins, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { verifyCoinCheckout } from "@/server/topup.functions";
+import { verifyCoinCheckout } from "@/lib/topup.functions";
 import { SparkleBurst } from "@/components/sparkle-burst";
 
 const SearchSchema = z.object({

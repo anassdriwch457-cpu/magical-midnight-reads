@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { COIN_PACKAGES } from "@/server/topup.functions";
+import { COIN_PACKAGES } from "@/lib/topup.functions";
 
 /**
  * Stripe webhook receiver — production live signal endpoint.
@@ -72,10 +72,12 @@ async function creditCheckoutSession(sessionId: string) {
   if (readErr) throw new Error(readErr.message);
 
   const newBalance = (existing?.coins ?? 0) + credit;
-  const { error: writeErr } = await supabaseAdmin.from("wallets").upsert(
-    { user_id: userId, coins: newBalance, updated_at: new Date().toISOString() },
-    { onConflict: "user_id" }
-  );
+  const { error: writeErr } = await supabaseAdmin
+    .from("wallets")
+    .upsert(
+      { user_id: userId, coins: newBalance, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" },
+    );
   if (writeErr) throw new Error(writeErr.message);
 
   if (record) {
@@ -106,8 +108,7 @@ async function creditCheckoutSession(sessionId: string) {
 export const Route = createFileRoute("/api/public/stripe-webhook")({
   server: {
     handlers: {
-      OPTIONS: async () =>
-        new Response(null, { status: 204, headers: corsHeaders }),
+      OPTIONS: async () => new Response(null, { status: 204, headers: corsHeaders }),
 
       POST: async ({ request }) => {
         const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -134,11 +135,7 @@ export const Route = createFileRoute("/api/public/stripe-webhook")({
         try {
           const stripe = await getStripe();
           // constructEventAsync uses Web Crypto and works in Workers / edge runtimes.
-          event = await stripe.webhooks.constructEventAsync(
-            rawBody,
-            signature,
-            webhookSecret
-          );
+          event = await stripe.webhooks.constructEventAsync(rawBody, signature, webhookSecret);
         } catch (err) {
           const msg = err instanceof Error ? err.message : "invalid signature";
           console.error("[stripe-webhook] signature verification failed:", msg);
