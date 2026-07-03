@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   createImportJob,
@@ -31,6 +31,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { ChapterUrlUploadView } from "./chapter-url-upload";
+import { SeriesBundleImportView } from "./series-bundle-import";
 
 type Job = {
   id: string;
@@ -62,18 +63,18 @@ export function MigratorView() {
   const activeRef = useRef<string | null>(null);
   const stoppedRef = useRef<Set<string>>(new Set());
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       const res = await list();
       setJobs((res.jobs as Job[]) ?? []);
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [list]);
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
 
   const runUntilDone = async (jobId: string) => {
     activeRef.current = jobId;
@@ -163,9 +164,9 @@ export function MigratorView() {
           <Download className="h-6 w-6 text-primary" /> Quick Import / Migrator
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Paste a series URL from a supported site. The tool fetches series info, copies
-          the cover and every chapter image to your Cloud storage, and creates the records
-          here. Only import content you have rights to host.
+          Paste a series URL from a supported site. The tool fetches series info, copies the cover
+          and every chapter image to your Cloud storage, and creates the records here. Only import
+          content you have rights to host.
         </p>
       </header>
 
@@ -211,13 +212,16 @@ export function MigratorView() {
         </div>
         <p className="text-xs text-muted-foreground flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
-          Imports run in the background. You can close this page — the job continues
-          on the next time it&apos;s resumed. Pause if you want to stop fetching.
+          Imports run in the background. You can close this page — the job continues on the next
+          time it&apos;s resumed. Pause if you want to stop fetching.
         </p>
       </div>
 
       {/* Manual URL upload (Drive / Gofile) */}
       <ChapterUrlUploadView />
+
+      {/* Owned series bundle */}
+      <SeriesBundleImportView />
 
       {/* Jobs list */}
       <div className="space-y-3">
@@ -327,9 +331,7 @@ function JobCard({
             {job.source_url}
           </a>
           {job.current_chapter && (
-            <div className="text-xs text-muted-foreground mt-1">
-              Current: {job.current_chapter}
-            </div>
+            <div className="text-xs text-muted-foreground mt-1">Current: {job.current_chapter}</div>
           )}
         </div>
         <div className="flex items-center gap-2">
