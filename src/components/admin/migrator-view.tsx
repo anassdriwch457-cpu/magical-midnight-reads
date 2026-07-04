@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   createImportJob,
   importSeriesFromJson,
+  importSeriesFromSourceApi,
   listImportJobs,
   runImportStep,
   cancelImportJob,
@@ -49,6 +50,11 @@ type Job = {
 };
 
 const SITES = [{ id: "mangago", label: "Mangago.me" }] as const;
+const SOURCE_API_SITES = [
+  { id: "mangabuddy", label: "MangaBuddy" },
+  { id: "kunmanga", label: "KunManga" },
+  { id: "comix", label: "Comix.to" },
+] as const;
 
 const GENERIC_IMPORT_EXAMPLE = {
   title: "Example Series",
@@ -69,6 +75,7 @@ const GENERIC_IMPORT_EXAMPLE = {
 export function MigratorView() {
   const create = useServerFn(createImportJob);
   const importJson = useServerFn(importSeriesFromJson);
+  const importSourceApi = useServerFn(importSeriesFromSourceApi);
   const list = useServerFn(listImportJobs);
   const step = useServerFn(runImportStep);
   const cancel = useServerFn(cancelImportJob);
@@ -77,11 +84,16 @@ export function MigratorView() {
   const [sourceSite, setSourceSite] = useState<string>("mangago");
   const [creating, setCreating] = useState(false);
   const [importingJson, setImportingJson] = useState(false);
+  const [importingSourceApi, setImportingSourceApi] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const activeRef = useRef<string | null>(null);
   const stoppedRef = useRef<Set<string>>(new Set());
   const [jsonPayload, setJsonPayload] = useState(JSON.stringify(GENERIC_IMPORT_EXAMPLE, null, 2));
+  const [sourceApiUrl, setSourceApiUrl] = useState("");
+  const [sourceApiSite, setSourceApiSite] = useState<string>("comix");
+  const [includeChapterImages, setIncludeChapterImages] = useState(true);
+  const [chapterLimit, setChapterLimit] = useState(50);
 
   const refresh = useCallback(async () => {
     try {
@@ -175,6 +187,33 @@ export function MigratorView() {
     }
   };
 
+  const onImportSourceApi = async () => {
+    if (!sourceApiUrl.trim()) {
+      toast.error("Enter a series URL");
+      return;
+    }
+    setImportingSourceApi(true);
+    try {
+      const res = await importSourceApi({
+        data: {
+          url: sourceApiUrl.trim(),
+          site: sourceApiSite as "mangabuddy" | "kunmanga" | "comix",
+          includeChapterImages,
+          chapterLimit,
+        },
+      });
+      toast.success(
+        `Imported ${res.chapters.length} chapter${res.chapters.length === 1 ? "" : "s"}`,
+      );
+      setSourceApiUrl("");
+      await refresh();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setImportingSourceApi(false);
+    }
+  };
+
   const onResume = (jobId: string) => {
     stoppedRef.current.delete(jobId);
     runUntilDone(jobId);
@@ -261,6 +300,73 @@ export function MigratorView() {
 
       {/* Manual URL upload (Drive / Gofile) */}
       <ChapterUrlUploadView />
+
+      <div className="rounded-xl border border-border bg-card/50 backdrop-blur p-6 space-y-4">
+        <div>
+          <h3 className="text-lg font-bold">Source API Import</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Fetch series data from your scrape API, then save it into Pearltoon. This uses the
+            server-side scraper key from project secrets.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-[1fr_220px]">
+          <div className="space-y-1.5">
+            <Label htmlFor="source-api-url">Series URL</Label>
+            <Input
+              id="source-api-url"
+              placeholder="https://comix.to/title/your-series"
+              value={sourceApiUrl}
+              onChange={(e) => setSourceApiUrl(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="source-api-site">Site</Label>
+            <Select value={sourceApiSite} onValueChange={setSourceApiSite}>
+              <SelectTrigger id="source-api-site">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SOURCE_API_SITES.map((site) => (
+                  <SelectItem key={site.id} value={site.id}>
+                    {site.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex items-center gap-2 rounded-md border border-border bg-background/50 px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              checked={includeChapterImages}
+              onChange={(e) => setIncludeChapterImages(e.target.checked)}
+            />
+            Include chapter images
+          </label>
+          <div className="space-y-1.5">
+            <Label htmlFor="chapter-limit">Chapter limit</Label>
+            <Input
+              id="chapter-limit"
+              type="number"
+              min={1}
+              max={200}
+              value={chapterLimit}
+              onChange={(e) => setChapterLimit(Number(e.target.value) || 50)}
+            />
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={onImportSourceApi} disabled={importingSourceApi}>
+            {importingSourceApi ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Import from Source API
+          </Button>
+        </div>
+      </div>
 
       <div className="rounded-xl border border-border bg-card/50 backdrop-blur p-6 space-y-4">
         <div>

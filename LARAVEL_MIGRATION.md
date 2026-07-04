@@ -2,13 +2,14 @@
 
 The frontend automatically switches data source based on env vars:
 
-| `VITE_API_URL` set | `VITE_SUPABASE_URL` set | Mode |
-|---|---|---|
-| ✅ | — | **Laravel** (live API) |
-| — | ✅ | Supabase (legacy) |
-| — | — | **Mock** (offline preview) |
+| `VITE_API_URL` set | `VITE_SUPABASE_URL` set | Mode                       |
+| ------------------ | ----------------------- | -------------------------- |
+| ✅                 | —                       | **Laravel** (live API)     |
+| —                  | ✅                      | Supabase (legacy)          |
+| —                  | —                       | **Mock** (offline preview) |
 
 Set on Coolify / VPS:
+
 ```env
 VITE_API_URL=https://api.your-domain.com/api
 ```
@@ -18,12 +19,14 @@ VITE_API_URL=https://api.your-domain.com/api
 All authenticated endpoints expect `Authorization: Bearer <sanctum_token>`.
 
 ### Auth
-- `POST /login`     `{ email, password }` → `{ token, user: { id, name, email } }`
-- `POST /register`  `{ name, email, password, password_confirmation }` → `{ token, user }`
-- `POST /logout`    → 204
-- `GET  /user`      → `{ id, name, email, ... }`
+
+- `POST /login` `{ email, password }` → `{ token, user: { id, name, email } }`
+- `POST /register` `{ name, email, password, password_confirmation }` → `{ token, user }`
+- `POST /logout` → 204
+- `GET  /user` → `{ id, name, email, ... }`
 
 ### Content (public)
+
 - `GET /series`
   Query params: `type`, `status`, `genre`, `q`, `sort`, `dir`, `page`, `per_page`, `trending`, `popular`, `exclude_id`, `ids`, `slug`
   Returns: `{ data: Series[], total: number }` or `Series[]`
@@ -32,10 +35,11 @@ All authenticated endpoints expect `Authorization: Bearer <sanctum_token>`.
 - `GET /site-settings` → `{ site_name, seo_description }`
 
 ### Wallet & unlocks (authenticated)
-- `GET  /wallet/balance`        → `{ coins: number }`
-- `GET  /user/unlocks`          → `[{ chapter_id }]`
-- `GET  /user/roles`            → `[{ role }]`
-- `POST /chapters/{id}/unlock`  → `{ success, balance, error? }`
+
+- `GET  /wallet/balance` → `{ coins: number }`
+- `GET  /user/unlocks` → `[{ chapter_id }]`
+- `GET  /user/roles` → `[{ role }]`
+- `POST /chapters/{id}/unlock` → `{ success, balance, error? }`
 
 ## Field shapes (Series / Chapter)
 
@@ -50,6 +54,18 @@ Chapter { id, series_id, number, title?, content?, price, created_at, updated_at
 
 Page    { id, chapter_id, page_number, image_url }
 ```
+
+## Admin migration tools
+
+The `/admin` Migrator tab includes:
+
+- a source-URL job runner for supported scrapers
+- a generic JSON importer for series metadata + chapter image URLs
+- a source-API importer that calls a server-side scrape endpoint with:
+  - `SCRAPER_API_KEY`
+  - optional `SCRAPER_API_URL`
+
+The source-API importer expects the endpoint to return series metadata and chapter image URLs, then saves them into `series`, `chapters`, and `chapter_pages`.
 
 ## Error handling
 

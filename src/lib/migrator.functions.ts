@@ -434,6 +434,7 @@ const GenericChapterSchema = z.object({
   title: z.string().max(255).nullable().optional(),
   price: z.number().min(0).max(100000).optional().default(0),
   imageUrls: z.array(z.string().url().max(2000)).min(1).max(500),
+  sourceUrl: z.string().url().max(500).nullable().optional(),
 });
 
 const GenericSeriesImportSchema = z.object({
@@ -449,173 +450,292 @@ const GenericSeriesImportSchema = z.object({
   imageUrls: z.array(z.string().url().max(2000)).min(1).max(500).optional(),
 });
 
-export const importSeriesFromJson = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) => GenericSeriesImportSchema.parse(input))
-  .handler(async ({ data, context }) => {
-    await assertStaff(context.userId);
+type GenericSeriesImport = z.infer<typeof GenericSeriesImportSchema>;
 
-    const chapterPayloads = data.chapters?.length
-      ? data.chapters
-      : data.imageUrls?.length
-        ? [{ number: 1, title: null, price: 0, imageUrls: data.imageUrls }]
-        : [];
-    if (chapterPayloads.length === 0) {
-      throw new Error("Provide chapters or imageUrls");
-    }
+const DEFAULT_SCRAPE_SERIES_ENDPOINT =
+  "https://id-preview--d6aba0fd-2981-4469-af57-122483712b54.lovable.app/api/public/scrape-series";
 
-    const baseSlug = slugify(data.slug?.trim() || data.title);
-    let seriesId: string | null = null;
-    let seriesSlug = baseSlug || "series";
+const ScrapeSeriesRequestSchema = z.object({
+  url: z.string().url().max(500),
+  site: z.enum(["mangabuddy", "kunmanga", "comix"]),
+  includeChapterImages: z.boolean().optional().default(false),
+  chapterLimit: z.number().int().min(1).max(200).optional().default(50),
+});
 
-    if (data.sourceUrl) {
-      const { data: existing, error } = await supabaseAdmin
+const ScrapeSeriesResponseSchema = z.object({
+  ok: z.boolean().optional(),
+  site: z.enum(["mangabuddy", "kunmanga", "comix"]),
+  source_url: z.string().url().max(500).optional(),
+  series: z.object({
+    title: z.string().min(1).max(255),
+    altNames: z.array(z.string().max(255)).optional().default([]),
+    description: z.string().max(5000).nullable().optional(),
+    coverUrl: z.string().url().max(2000).nullable().optional(),
+    status: z.enum(["ongoing", "completed", "hiatus"]).optional(),
+    genres: z.array(z.string().min(1).max(50)).optional().default([]),
+    author: z.string().max(255).nullable().optional(),
+    slug: z.string().max(200).optional(),
+  }),
+  chapter_count: z.number().int().min(0).optional(),
+  chapters: z.array(
+    z.object({
+      number: z.number().int().min(0).max(100000),
+      title: z.string().max(255).nullable().optional(),
+      sourceUrl: z.string().url().max(500).nullable().optional(),
+      images: z.array(z.string().url().max(2000)).optional().default([]),
+    }),
+  ),
+});
+
+async function importGenericSeries(data: GenericSeriesImport) {
+  const chapterPayloads = data.chapters?.length
+    ? data.chapters
+    : data.imageUrls?.length
+      ? [{ number: 1, title: null, price: 0, imageUrls: data.imageUrls }]
+      : [];
+  if (chapterPayloads.length === 0) {
+    throw new Error("Provide chapters or imageUrls");
+  }
+
+  const baseSlug = slugify(data.slug?.trim() || data.title);
+  let seriesId: string | null = null;
+  let seriesSlug = baseSlug || "series";
+
+  if (data.sourceUrl) {
+    const { data: existing, error } = await supabaseAdmin
+      .from("series")
+      .select("id, slug")
+      .eq("source_url", data.sourceUrl)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (existing) {
+      seriesId = existing.id;
+      seriesSlug = existing.slug;
+      const { error: updateError } = await supabaseAdmin
         .from("series")
-        .select("id, slug")
-        .eq("source_url", data.sourceUrl)
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      if (existing) {
-        seriesId = existing.id;
-        seriesSlug = existing.slug;
-        const { error: updateError } = await supabaseAdmin
-          .from("series")
-          .update({
-            title: data.title,
-            description: data.description ?? null,
-            author: data.author ?? null,
-            status: data.status,
-            type: data.type,
-            genres: data.genres,
-            source_url: data.sourceUrl,
-          })
-          .eq("id", seriesId);
-        if (updateError) throw new Error(`Update series failed: ${updateError.message}`);
-      }
-    }
-
-    if (!seriesId) {
-      let candidate = seriesSlug;
-      for (let i = 2; ; i++) {
-        const { data: clash, error } = await supabaseAdmin
-          .from("series")
-          .select("id")
-          .eq("slug", candidate)
-          .maybeSingle();
-        if (error) throw new Error(error.message);
-        if (!clash) {
-          seriesSlug = candidate;
-          break;
-        }
-        candidate = `${baseSlug || "series"}-${i}`;
-      }
-
-      const { data: created, error } = await supabaseAdmin
-        .from("series")
-        .insert({
+        .update({
           title: data.title,
-          slug: seriesSlug,
           description: data.description ?? null,
           author: data.author ?? null,
           status: data.status,
           type: data.type,
           genres: data.genres,
-          source_url: data.sourceUrl ?? null,
+          source_url: data.sourceUrl,
+        })
+        .eq("id", seriesId);
+      if (updateError) throw new Error(`Update series failed: ${updateError.message}`);
+    }
+  }
+
+  if (!seriesId) {
+    let candidate = seriesSlug;
+    for (let i = 2; ; i++) {
+      const { data: clash, error } = await supabaseAdmin
+        .from("series")
+        .select("id")
+        .eq("slug", candidate)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!clash) {
+        seriesSlug = candidate;
+        break;
+      }
+      candidate = `${baseSlug || "series"}-${i}`;
+    }
+
+    const { data: created, error } = await supabaseAdmin
+      .from("series")
+      .insert({
+        title: data.title,
+        slug: seriesSlug,
+        description: data.description ?? null,
+        author: data.author ?? null,
+        status: data.status,
+        type: data.type,
+        genres: data.genres,
+        source_url: data.sourceUrl ?? null,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(`Create series failed: ${error.message}`);
+    seriesId = created.id;
+  }
+
+  if (!seriesId) {
+    throw new Error("Failed to resolve series ID");
+  }
+  const resolvedSeriesId = seriesId;
+
+  const chapters: Array<{
+    chapterNumber: number;
+    chapterId: string;
+    savedPages: number;
+    totalPages: number;
+  }> = [];
+  for (const chapter of chapterPayloads) {
+    const { data: existingChapter, error: chapterLookupError } = await supabaseAdmin
+      .from("chapters")
+      .select("id")
+      .eq("series_id", resolvedSeriesId)
+      .eq("number", chapter.number)
+      .maybeSingle();
+    if (chapterLookupError) throw new Error(chapterLookupError.message);
+
+    let chapterId: string;
+    if (existingChapter) {
+      chapterId = existingChapter.id;
+      const { error: updateError } = await supabaseAdmin
+        .from("chapters")
+        .update({
+          title: chapter.title ?? null,
+          price: chapter.price ?? 0,
+          source_url: chapter.sourceUrl ?? null,
+        })
+        .eq("id", chapterId);
+      if (updateError) throw new Error(`Update chapter failed: ${updateError.message}`);
+      const { error: deletePagesError } = await supabaseAdmin
+        .from("chapter_pages")
+        .delete()
+        .eq("chapter_id", chapterId);
+      if (deletePagesError) throw new Error(deletePagesError.message);
+    } else {
+      const { data: createdChapter, error: createChapterError } = await supabaseAdmin
+        .from("chapters")
+        .insert({
+          series_id: resolvedSeriesId,
+          number: chapter.number,
+          title: chapter.title ?? null,
+          price: chapter.price ?? 0,
+          source_url: chapter.sourceUrl ?? null,
         })
         .select("id")
         .single();
-      if (error) throw new Error(`Create series failed: ${error.message}`);
-      seriesId = created.id;
-    }
-
-    if (!seriesId) {
-      throw new Error("Failed to resolve series ID");
-    }
-    const resolvedSeriesId = seriesId;
-
-    const chapters = [];
-    for (const chapter of chapterPayloads) {
-      const { data: existingChapter, error: chapterLookupError } = await supabaseAdmin
-        .from("chapters")
-        .select("id")
-        .eq("series_id", resolvedSeriesId)
-        .eq("number", chapter.number)
-        .maybeSingle();
-      if (chapterLookupError) throw new Error(chapterLookupError.message);
-
-      let chapterId: string;
-      if (existingChapter) {
-        chapterId = existingChapter.id;
-        const { error: updateError } = await supabaseAdmin
-          .from("chapters")
-          .update({
-            title: chapter.title ?? null,
-            price: chapter.price ?? 0,
-            source_url: null,
-          })
-          .eq("id", chapterId);
-        if (updateError) throw new Error(`Update chapter failed: ${updateError.message}`);
-        const { error: deletePagesError } = await supabaseAdmin
-          .from("chapter_pages")
-          .delete()
-          .eq("chapter_id", chapterId);
-        if (deletePagesError) throw new Error(deletePagesError.message);
-      } else {
-        const { data: createdChapter, error: createChapterError } = await supabaseAdmin
-          .from("chapters")
-          .insert({
-            series_id: resolvedSeriesId,
-            number: chapter.number,
-            title: chapter.title ?? null,
-            price: chapter.price ?? 0,
-            source_url: null,
-          })
-          .select("id")
-          .single();
-        if (createChapterError)
-          throw new Error(`Create chapter failed: ${createChapterError.message}`);
-        chapterId = createdChapter.id;
+      if (createChapterError) {
+        throw new Error(`Create chapter failed: ${createChapterError.message}`);
       }
+      chapterId = createdChapter.id;
+    }
 
-      let savedPages = 0;
-      let pageNumber = 1;
-      for (const rawUrl of chapter.imageUrls) {
-        const url = rawUrl.trim();
-        if (!url) {
-          pageNumber++;
-          continue;
-        }
-        try {
-          const { bytes, contentType } = await downloadRemoteImage(url);
-          const ext = extFromContentType(contentType);
-          const path = `import/${seriesSlug}/ch-${chapter.number}/p-${String(pageNumber).padStart(4, "0")}.${ext}`;
-          const publicUrl = await uploadBytes(path, bytes, contentType);
-          const { error: pageError } = await supabaseAdmin.from("chapter_pages").insert({
-            chapter_id: chapterId,
-            page_number: pageNumber,
-            image_url: publicUrl,
-          });
-          if (pageError) throw new Error(pageError.message);
-          savedPages++;
-        } catch (err) {
-          throw new Error(
-            `Chapter ${chapter.number} page ${pageNumber}: ${(err as Error).message}`,
-          );
-        }
+    let savedPages = 0;
+    let pageNumber = 1;
+    for (const rawUrl of chapter.imageUrls) {
+      const url = rawUrl.trim();
+      if (!url) {
         pageNumber++;
+        continue;
       }
-
-      chapters.push({
-        chapterNumber: chapter.number,
-        chapterId,
-        savedPages,
-        totalPages: chapter.imageUrls.length,
-      });
+      try {
+        const { bytes, contentType } = await downloadRemoteImage(url);
+        const ext = extFromContentType(contentType);
+        const path = `import/${seriesSlug}/ch-${chapter.number}/p-${String(pageNumber).padStart(
+          4,
+          "0",
+        )}.${ext}`;
+        const publicUrl = await uploadBytes(path, bytes, contentType);
+        const { error: pageError } = await supabaseAdmin.from("chapter_pages").insert({
+          chapter_id: chapterId,
+          page_number: pageNumber,
+          image_url: publicUrl,
+        });
+        if (pageError) throw new Error(pageError.message);
+        savedPages++;
+      } catch (err) {
+        throw new Error(`Chapter ${chapter.number} page ${pageNumber}: ${(err as Error).message}`);
+      }
+      pageNumber++;
     }
 
-    return {
-      seriesId,
-      slug: seriesSlug,
-      chapters,
-    };
+    chapters.push({
+      chapterNumber: chapter.number,
+      chapterId,
+      savedPages,
+      totalPages: chapter.imageUrls.length,
+    });
+  }
+
+  return {
+    seriesId,
+    slug: seriesSlug,
+    chapters,
+  };
+}
+
+async function fetchScrapeSeries(data: z.input<typeof ScrapeSeriesRequestSchema>) {
+  const endpoint = (process.env.SCRAPER_API_URL || DEFAULT_SCRAPE_SERIES_ENDPOINT).trim();
+  const apiKey = process.env.SCRAPER_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("Missing SCRAPER_API_KEY");
+  }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  const raw = await response.text();
+  let parsed: unknown = null;
+  try {
+    parsed = raw ? JSON.parse(raw) : null;
+  } catch {
+    parsed = null;
+  }
+
+  if (!response.ok) {
+    const parsedMessage =
+      parsed &&
+      typeof parsed === "object" &&
+      "message" in parsed &&
+      typeof (parsed as { message?: unknown }).message === "string"
+        ? ((parsed as { message: string }).message ?? null)
+        : null;
+    const message = parsedMessage ?? (raw.trim() || `Scrape failed (${response.status})`);
+    throw new Error(message);
+  }
+
+  return ScrapeSeriesResponseSchema.parse(parsed);
+}
+
+function mapScrapeResponseToImport(
+  payload: z.infer<typeof ScrapeSeriesResponseSchema>,
+): GenericSeriesImport {
+  return {
+    title: payload.series.title,
+    description: payload.series.description ?? null,
+    author: payload.series.author ?? null,
+    slug: payload.series.slug ?? undefined,
+    type: "manga",
+    status: payload.series.status ?? "ongoing",
+    sourceUrl: payload.source_url,
+    genres: payload.series.genres ?? [],
+    chapters: payload.chapters.map((chapter) => ({
+      number: chapter.number,
+      title: chapter.title ?? null,
+      price: 0,
+      sourceUrl: chapter.sourceUrl ?? payload.source_url ?? undefined,
+      imageUrls: chapter.images,
+    })),
+  };
+}
+
+export const importSeriesFromJson = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => GenericSeriesImportSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.userId);
+    return importGenericSeries(data);
+  });
+
+export const importSeriesFromSourceApi = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => ScrapeSeriesRequestSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.userId);
+    const scraped = await fetchScrapeSeries(data);
+    const mapped = mapScrapeResponseToImport(scraped);
+    return importGenericSeries(mapped);
   });
