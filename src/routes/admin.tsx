@@ -2087,9 +2087,9 @@ function PaymentsView() {
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-                Coin purchases run through Lovable's built-in Stripe integration. A test environment
-                is active by default — switch to live in your project's Payments settings when ready
-                to charge real cards.
+                Coin purchases run through the built-in Stripe integration. A test environment is
+                active by default — switch to live in your Payments settings when ready to charge
+                real cards.
               </p>
             </div>
           </div>
@@ -2107,7 +2107,7 @@ function PaymentsView() {
           <h2 className="text-xl font-bold">API Keys & Secrets</h2>
         </div>
         <p className="text-sm text-muted-foreground mb-4">
-          You don't need to paste Stripe keys manually — Lovable's built-in payments handle this
+          You don't need to paste Stripe keys manually — the built-in payments handle this
           automatically. For custom integrations, store keys in <strong>Cloud → Secrets</strong> —
           never in code.
         </p>
