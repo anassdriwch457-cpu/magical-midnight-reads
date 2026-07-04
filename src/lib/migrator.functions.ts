@@ -200,10 +200,8 @@ export const runImportStep = createServerFn({ method: "POST" })
           throw new Error(`Unsupported source site: ${job.source_site}`);
         }
 
-        await appendLog(
-          job.id,
-          `Found "${scraped.title}" with ${scraped.chapters.length} chapters`,
-        );
+        const scrapedChapters = scraped.chapters ?? [];
+        await appendLog(job.id, `Found "${scraped.title}" with ${scrapedChapters.length} chapters`);
 
         // Dedupe: if a series with this source_url already exists, reuse it.
         const { data: existing } = await supabaseAdmin
@@ -269,7 +267,7 @@ export const runImportStep = createServerFn({ method: "POST" })
         }
 
         // Insert any missing chapter rows (no pages yet).
-        for (const ch of scraped.chapters) {
+        for (const ch of scrapedChapters) {
           const { data: existingCh } = await supabaseAdmin
             .from("chapters")
             .select("id")
@@ -295,11 +293,11 @@ export const runImportStep = createServerFn({ method: "POST" })
         await setJob(job.id, {
           series_id: seriesId,
           status: "importing_chapters",
-          total_chapters: scraped.chapters.length,
+          total_chapters: scrapedChapters.length,
           completed_chapters: 0,
           current_chapter: "Ready to import chapters",
         });
-        await appendLog(job.id, `Series ready. Importing ${scraped.chapters.length} chapters…`);
+        await appendLog(job.id, `Series ready. Importing ${scrapedChapters.length} chapters…`);
 
         const { data: refreshed } = await supabaseAdmin
           .from("import_jobs")
@@ -663,16 +661,17 @@ async function importGenericSeries(data: GenericSeriesImport) {
 async function fetchScrapeSeries(data: z.input<typeof ScrapeSeriesRequestSchema>) {
   const endpoint = (process.env.SCRAPER_API_URL || DEFAULT_SCRAPE_SERIES_ENDPOINT).trim();
   const apiKey = process.env.SCRAPER_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error("Missing SCRAPER_API_KEY");
-  }
 
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      Authorization: `Bearer ${apiKey}`,
+      ...(apiKey
+        ? {
+            "x-api-key": apiKey,
+            Authorization: `Bearer ${apiKey}`,
+          }
+        : {}),
     },
     body: JSON.stringify(data),
   });
@@ -737,5 +736,38 @@ export const importSeriesFromSourceApi = createServerFn({ method: "POST" })
     await assertStaff(context.userId);
     const scraped = await fetchScrapeSeries(data);
     const mapped = mapScrapeResponseToImport(scraped);
+    return importGenericSeries(mapped);
+  });
+
+const JsonUrlImportSchema = z.object({
+  url: z.string().url().max(2000),
+});
+
+export const importSeriesFromJsonUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => JsonUrlImportSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.userId);
+
+    const response = await fetch(data.url, {
+      headers: {
+        Accept: "application/json,text/plain;q=0.9,*/*;q=0.8",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      },
+    });
+    const body = await response.text();
+    if (!response.ok) {
+      throw new Error(`Fetch failed (${response.status}): ${body.slice(0, 200)}`);
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      throw new Error("JSON URL did not return valid JSON");
+    }
+
+    const mapped = GenericSeriesImportSchema.parse(parsed);
     return importGenericSeries(mapped);
   });
