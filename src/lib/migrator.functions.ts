@@ -86,16 +86,24 @@ function slugify(value: string): string {
     .replace(/^-|-$/g, "");
 }
 
-async function downloadRemoteImage(url: string): Promise<{
+async function downloadRemoteImage(
+  url: string,
+  referer?: string,
+): Promise<{
   bytes: Uint8Array;
   contentType: string;
 }> {
+  const headers: Record<string, string> = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+  };
+  if (referer) {
+    headers.Referer = referer;
+    headers.Origin = new URL(referer).origin;
+  }
   const res = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-    },
+    headers,
     redirect: "follow",
   });
   if (!res.ok) throw new Error(`Image fetch failed (${res.status}): ${url}`);
@@ -861,7 +869,7 @@ async function importGenericSeries(db: DbClient, data: GenericSeriesImport) {
         continue;
       }
       try {
-        const { bytes, contentType } = await downloadRemoteImage(url);
+        const { bytes, contentType } = await downloadRemoteImage(url, chapter.sourceUrl);
         const ext = extFromContentType(contentType);
         const path = `import/${seriesSlug}/ch-${chapter.number}/p-${String(pageNumber).padStart(
           4,
