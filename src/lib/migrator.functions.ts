@@ -929,8 +929,9 @@ async function scrapeSeriesWithFirecrawl(
   for (const chapter of seriesChapters) {
     const chapterPage = await fetchFirecrawlScrape(chapter.sourceUrl, ["markdown", "rawHtml"]);
     const scrapeId = firstString(chapterPage.data?.metadata?.scrapeId);
-    let imageUrls: string[] = [];
-    if (scrapeId) {
+    const chapterContent = chapterPage.data?.rawHtml ?? chapterPage.data?.markdown ?? "";
+    let imageUrls = extractImageUrls(chapterContent);
+    if (imageUrls.length === 0 && scrapeId) {
       const interactOutput = await fetchFirecrawlInteract(scrapeId, {
         code: [
           "const collected = new Set();",
@@ -948,10 +949,6 @@ async function scrapeSeriesWithFirecrawl(
         timeout: 180,
       });
       imageUrls = parseJsonArrayFromText(interactOutput);
-    }
-    if (imageUrls.length === 0) {
-      const chapterContent = chapterPage.data?.rawHtml ?? chapterPage.data?.markdown ?? "";
-      imageUrls = extractImageUrls(chapterContent);
     }
     if (imageUrls.length === 0) {
       throw new Error(`No page images found for chapter ${chapter.number}`);
