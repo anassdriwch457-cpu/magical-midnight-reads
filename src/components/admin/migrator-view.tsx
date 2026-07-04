@@ -379,8 +379,7 @@ export function MigratorView() {
         <div>
           <h3 className="text-lg font-bold">Series Link Import</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Fetch series data from your scrape API, then save it into Pearltoon. This uses the
-            server-side scraper key from project secrets.
+            Fetch series data from the live scraper, then save it into Pearltoon.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-[1fr_220px]">
@@ -437,7 +436,7 @@ export function MigratorView() {
             ) : (
               <Download className="h-4 w-4" />
             )}
-            Import from Source API
+            Import from Firecrawl
           </Button>
         </div>
         <div className="space-y-1.5">

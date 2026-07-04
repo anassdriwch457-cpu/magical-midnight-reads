@@ -461,15 +461,15 @@ const GenericSeriesImportSchema = z.object({
   type: z.enum(["manga", "novel"]).optional().default("manga"),
   status: z.enum(["ongoing", "completed", "hiatus"]).optional().default("ongoing"),
   sourceUrl: z.string().url().max(500).nullable().optional(),
+  coverUrl: z.string().url().max(2000).nullable().optional(),
   genres: z.array(z.string().min(1).max(50)).max(20).optional().default([]),
-  chapters: z.array(GenericChapterSchema).min(1).max(100).optional(),
+  chapters: z.array(GenericChapterSchema).min(1).max(200).optional(),
   imageUrls: z.array(z.string().url().max(2000)).min(1).max(500).optional(),
 });
 
 type GenericSeriesImport = z.infer<typeof GenericSeriesImportSchema>;
 
-const DEFAULT_SCRAPE_SERIES_ENDPOINT =
-  "https://id-preview--d6aba0fd-2981-4469-af57-122483712b54.lovable.app/api/public/scrape-series";
+const FIRECRAWL_SCRAPE_ENDPOINT = "https://api.firecrawl.dev/v2/scrape";
 
 const ScrapeSeriesRequestSchema = z.object({
   url: z.string().url().max(500),
@@ -478,30 +478,248 @@ const ScrapeSeriesRequestSchema = z.object({
   chapterLimit: z.number().int().min(1).max(200).optional().default(50),
 });
 
-const ScrapeSeriesResponseSchema = z.object({
-  ok: z.boolean().optional(),
-  site: z.enum(["mangabuddy", "kunmanga", "comix"]),
-  source_url: z.string().url().max(500).optional(),
-  series: z.object({
-    title: z.string().min(1).max(255),
-    altNames: z.array(z.string().max(255)).optional().default([]),
-    description: z.string().max(5000).nullable().optional(),
-    coverUrl: z.string().url().max(2000).nullable().optional(),
-    status: z.enum(["ongoing", "completed", "hiatus"]).optional(),
-    genres: z.array(z.string().min(1).max(50)).optional().default([]),
-    author: z.string().max(255).nullable().optional(),
-    slug: z.string().max(200).optional(),
-  }),
-  chapter_count: z.number().int().min(0).optional(),
-  chapters: z.array(
-    z.object({
-      number: z.number().int().min(0).max(100000),
-      title: z.string().max(255).nullable().optional(),
-      sourceUrl: z.string().url().max(500).nullable().optional(),
-      images: z.array(z.string().url().max(2000)).optional().default([]),
-    }),
-  ),
+const FirecrawlScrapeResponseSchema = z.object({
+  success: z.boolean().optional(),
+  data: z
+    .object({
+      markdown: z.string().optional(),
+      rawHtml: z.string().optional(),
+      html: z.string().optional(),
+      links: z.array(z.string().url().max(2000)).optional().default([]),
+      metadata: z.record(z.string(), z.unknown()).optional().default({}),
+    })
+    .optional(),
 });
+
+type FirecrawlScrapeResponse = z.infer<typeof FirecrawlScrapeResponseSchema>;
+
+const FirecrawlInteractResponseSchema = z.object({
+  success: z.boolean().optional(),
+  output: z.string().optional(),
+  stdout: z.string().optional(),
+  result: z.string().optional(),
+  stderr: z.string().optional(),
+  error: z.string().optional(),
+  exitCode: z.number().optional(),
+  killed: z.boolean().optional(),
+});
+
+function firstString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function metadataString(metadata: Record<string, unknown>, ...keys: string[]): string | null {
+  for (const key of keys) {
+    const value = firstString(metadata[key]);
+    if (value) return value;
+  }
+  return null;
+}
+
+function uniqueUrls(urls: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const url of urls) {
+    const trimmed = url.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+function normalizeChapterTitle(title: string | null | undefined): string | null {
+  const value = title?.trim();
+  return value ? value : null;
+}
+
+function parseChapterNumberFromText(text: string): number | null {
+  const match = text.match(/(?:Ch\.?|Chapter)\s*([0-9]+(?:\.[0-9]+)?)/i);
+  if (!match) return null;
+  const number = Number(match[1]);
+  return Number.isFinite(number) ? number : null;
+}
+
+function parseChapterNumberFromUrl(url: string): number | null {
+  const patterns = [
+    /(?:chapter|ch)[-_/. ]*([0-9]+(?:\.[0-9]+)?)/i,
+    /\/([0-9]+(?:\.[0-9]+)?)\s*[-_]?chapter/i,
+    /\/chapters?\/([0-9]+(?:\.[0-9]+)?)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (!match) continue;
+    const number = Number(match[1]);
+    if (Number.isFinite(number)) return number;
+  }
+  return null;
+}
+
+function extractSeriesChapterLinks(
+  markdown: string,
+  links: string[],
+  sourceUrl: string,
+): Array<{ number: number; title: string | null; sourceUrl: string }> {
+  const sourceOrigin = new URL(sourceUrl).origin;
+  const candidates = new Map<string, { number: number; title: string | null; sourceUrl: string }>();
+
+  const addCandidate = (
+    sourceUrlCandidate: string,
+    number: number | null,
+    title: string | null,
+  ) => {
+    if (!sourceUrlCandidate.startsWith("http")) return;
+    const parsed = new URL(sourceUrlCandidate);
+    if (parsed.origin !== sourceOrigin) return;
+    const path = parsed.pathname.toLowerCase();
+    if (
+      !/chapter|chapters|ch-|\bch\./i.test(path) &&
+      !/chapter|chapters|ch-|\bch\./i.test(title ?? "")
+    ) {
+      return;
+    }
+    const resolvedNumber =
+      number ?? parseChapterNumberFromUrl(sourceUrlCandidate) ?? candidates.size + 1;
+    const existing = candidates.get(sourceUrlCandidate);
+    if (!existing || resolvedNumber < existing.number) {
+      candidates.set(sourceUrlCandidate, {
+        number: resolvedNumber,
+        title: normalizeChapterTitle(title),
+        sourceUrl: sourceUrlCandidate,
+      });
+    }
+  };
+
+  const markdownLinkRe =
+    /\[([^\]]*?(?:Ch\.?|Chapter)\s*[0-9]+(?:\.[0-9]+)?[^\]]*)\]\((https?:\/\/[^)\s]+)\)/gi;
+  for (const match of markdown.matchAll(markdownLinkRe)) {
+    addCandidate(match[2], parseChapterNumberFromText(match[1]), match[1]);
+  }
+
+  const markdownUrlRe = /(https?:\/\/[^\s)]+chapter[^\s)]*)/gi;
+  for (const match of markdown.matchAll(markdownUrlRe)) {
+    addCandidate(match[1], parseChapterNumberFromUrl(match[1]), null);
+  }
+
+  for (const link of links) {
+    addCandidate(link, parseChapterNumberFromUrl(link), null);
+  }
+
+  return [...candidates.values()].sort((a, b) => a.number - b.number);
+}
+
+function extractImageUrls(content: string): string[] {
+  const urls: string[] = [];
+  const rawHtmlImageRe =
+    /<img[^>]*class="[^"]*rpage-page__img[^"]*"[^>]*src="(https?:\/\/[^"]+)"/gi;
+  for (const match of content.matchAll(rawHtmlImageRe)) {
+    urls.push(match[1]);
+  }
+  const markdownImageRe = /!\[[^\]]*]\((https?:\/\/[^)\s]+)\)/gi;
+  for (const match of content.matchAll(markdownImageRe)) {
+    urls.push(match[1]);
+  }
+  return uniqueUrls(urls);
+}
+
+async function fetchFirecrawlScrape(
+  url: string,
+  formats: Array<"markdown" | "links" | "html" | "rawHtml"> = ["markdown", "links", "rawHtml"],
+): Promise<FirecrawlScrapeResponse> {
+  const response = await fetch(FIRECRAWL_SCRAPE_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      url,
+      formats,
+      onlyMainContent: false,
+    }),
+  });
+
+  const raw = await response.text();
+  let parsed: unknown = null;
+  try {
+    parsed = raw ? JSON.parse(raw) : null;
+  } catch {
+    parsed = null;
+  }
+
+  if (!response.ok) {
+    const message =
+      parsed &&
+      typeof parsed === "object" &&
+      "error" in parsed &&
+      typeof (parsed as { error?: unknown }).error === "string"
+        ? ((parsed as { error: string }).error ?? null)
+        : raw.trim() || `Firecrawl scrape failed (${response.status})`;
+    throw new Error(message);
+  }
+
+  return FirecrawlScrapeResponseSchema.parse(parsed);
+}
+
+async function fetchFirecrawlInteract(
+  scrapeId: string,
+  input: {
+    prompt?: string;
+    code?: string;
+    language?: "node" | "python" | "bash";
+    timeout?: number;
+  },
+): Promise<string> {
+  const response = await fetch(`https://api.firecrawl.dev/v2/scrape/${scrapeId}/interact`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+
+  const raw = await response.text();
+  let parsed: unknown = null;
+  try {
+    parsed = raw ? JSON.parse(raw) : null;
+  } catch {
+    parsed = null;
+  }
+
+  if (!response.ok) {
+    const message =
+      parsed &&
+      typeof parsed === "object" &&
+      "error" in parsed &&
+      typeof (parsed as { error?: unknown }).error === "string"
+        ? ((parsed as { error: string }).error ?? null)
+        : raw.trim() || `Firecrawl interact failed (${response.status})`;
+    throw new Error(message);
+  }
+
+  const output = FirecrawlInteractResponseSchema.parse(parsed);
+  return output.output ?? output.stdout ?? output.result ?? "";
+}
+
+function parseJsonArrayFromText(text: string): string[] {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  const fenceMatch = trimmed.match(/```json\s*([\s\S]*?)\s*```/i);
+  const candidate = (fenceMatch?.[1] ?? trimmed).trim();
+  try {
+    const parsed = JSON.parse(candidate);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((value): value is string => typeof value === "string");
+    }
+  } catch {
+    // fall through
+  }
+
+  return candidate
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => /^https?:\/\//i.test(line));
+}
 
 async function importGenericSeries(db: DbClient, data: GenericSeriesImport) {
   const chapterPayloads = data.chapters?.length
@@ -537,6 +755,7 @@ async function importGenericSeries(db: DbClient, data: GenericSeriesImport) {
           type: data.type,
           genres: data.genres,
           source_url: data.sourceUrl,
+          cover_url: data.coverUrl ?? null,
         })
         .eq("id", seriesId);
       if (updateError) throw new Error(`Update series failed: ${updateError.message}`);
@@ -570,6 +789,7 @@ async function importGenericSeries(db: DbClient, data: GenericSeriesImport) {
         type: data.type,
         genres: data.genres,
         source_url: data.sourceUrl ?? null,
+        cover_url: data.coverUrl ?? null,
       })
       .select("id")
       .single();
@@ -676,66 +896,86 @@ async function importGenericSeries(db: DbClient, data: GenericSeriesImport) {
   };
 }
 
-async function fetchScrapeSeries(data: z.input<typeof ScrapeSeriesRequestSchema>) {
-  const endpoint = (process.env.SCRAPER_API_URL || DEFAULT_SCRAPE_SERIES_ENDPOINT).trim();
-  const apiKey = process.env.SCRAPER_API_KEY?.trim();
+async function scrapeSeriesWithFirecrawl(
+  data: z.input<typeof ScrapeSeriesRequestSchema>,
+): Promise<GenericSeriesImport> {
+  const seriesPage = await fetchFirecrawlScrape(data.url, ["markdown", "links", "rawHtml"]);
+  const markdown = seriesPage.data?.markdown ?? "";
+  const metadata = seriesPage.data?.metadata ?? {};
+  const links = seriesPage.data?.links ?? [];
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(apiKey
-        ? {
-            "x-api-key": apiKey,
-            Authorization: `Bearer ${apiKey}`,
-          }
-        : {}),
-    },
-    body: JSON.stringify(data),
-  });
+  const sourceUrl = metadataString(metadata, "sourceURL", "url") ?? data.url;
+  const title =
+    metadataString(metadata, "ogTitle", "title") ??
+    markdown
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line && !line.startsWith("[") && !line.includes("Comment"))
+      ?.slice(0, 255) ??
+    "Untitled";
+  const description = metadataString(metadata, "ogDescription", "description");
+  const coverUrl = metadataString(metadata, "ogImage", "image", "favicon");
+  const slug = sourceUrl.replace(/\/+$/, "").split("/").filter(Boolean).pop() ?? undefined;
 
-  const raw = await response.text();
-  let parsed: unknown = null;
-  try {
-    parsed = raw ? JSON.parse(raw) : null;
-  } catch {
-    parsed = null;
+  const seriesChapters = extractSeriesChapterLinks(markdown, links, sourceUrl).slice(
+    0,
+    data.chapterLimit,
+  );
+  if (seriesChapters.length === 0) {
+    throw new Error("No chapters found on the series page");
   }
 
-  if (!response.ok) {
-    const parsedMessage =
-      parsed &&
-      typeof parsed === "object" &&
-      "message" in parsed &&
-      typeof (parsed as { message?: unknown }).message === "string"
-        ? ((parsed as { message: string }).message ?? null)
-        : null;
-    const message = parsedMessage ?? (raw.trim() || `Scrape failed (${response.status})`);
-    throw new Error(message);
-  }
-
-  return ScrapeSeriesResponseSchema.parse(parsed);
-}
-
-function mapScrapeResponseToImport(
-  payload: z.infer<typeof ScrapeSeriesResponseSchema>,
-): GenericSeriesImport {
-  return {
-    title: payload.series.title,
-    description: payload.series.description ?? null,
-    author: payload.series.author ?? null,
-    slug: payload.series.slug ?? undefined,
-    type: "manga",
-    status: payload.series.status ?? "ongoing",
-    sourceUrl: payload.source_url,
-    genres: payload.series.genres ?? [],
-    chapters: payload.chapters.map((chapter) => ({
+  const chapters: GenericSeriesImport["chapters"] = [];
+  for (const chapter of seriesChapters) {
+    const chapterPage = await fetchFirecrawlScrape(chapter.sourceUrl, ["markdown", "rawHtml"]);
+    const scrapeId = firstString(chapterPage.data?.metadata?.scrapeId);
+    let imageUrls: string[] = [];
+    if (scrapeId) {
+      const interactOutput = await fetchFirecrawlInteract(scrapeId, {
+        code: [
+          "const collected = new Set();",
+          "for (let i = 1; i <= 200; i++) {",
+          '  const button = page.getByRole("button", { name: `Go to page ${i}`, exact: true });',
+          "  if ((await button.count()) === 0) break;",
+          "  await button.click();",
+          "  await page.waitForTimeout(400);",
+          '  const srcs = await page.$$eval("img.rpage-page__img", (imgs) => imgs.map((img) => img.getAttribute("src")).filter(Boolean));',
+          "  for (const src of srcs) collected.add(src);",
+          "}",
+          "JSON.stringify([...collected]);",
+        ].join("\n"),
+        language: "node",
+        timeout: 180,
+      });
+      imageUrls = parseJsonArrayFromText(interactOutput);
+    }
+    if (imageUrls.length === 0) {
+      const chapterContent = chapterPage.data?.rawHtml ?? chapterPage.data?.markdown ?? "";
+      imageUrls = extractImageUrls(chapterContent);
+    }
+    if (imageUrls.length === 0) {
+      throw new Error(`No page images found for chapter ${chapter.number}`);
+    }
+    chapters.push({
       number: chapter.number,
-      title: chapter.title ?? null,
+      title: chapter.title,
       price: 0,
-      sourceUrl: chapter.sourceUrl ?? payload.source_url ?? undefined,
-      imageUrls: chapter.images,
-    })),
+      sourceUrl: chapter.sourceUrl,
+      imageUrls,
+    });
+  }
+
+  return {
+    title,
+    description,
+    author: null,
+    slug,
+    type: "manga",
+    status: "ongoing",
+    sourceUrl,
+    coverUrl,
+    genres: [],
+    chapters,
   };
 }
 
@@ -754,8 +994,7 @@ export const importSeriesFromSourceApi = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const db = getDbClient(context);
     await assertStaff(db, context.userId);
-    const scraped = await fetchScrapeSeries(data);
-    const mapped = mapScrapeResponseToImport(scraped);
+    const mapped = await scrapeSeriesWithFirecrawl(data);
     return importGenericSeries(db, mapped);
   });
 
