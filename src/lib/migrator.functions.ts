@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   scrapeMangagoSeries,
@@ -11,11 +13,16 @@ import {
 
 /* ============================== AUTH ============================== */
 
-async function assertStaff(userId: string) {
-  const { data: roles, error } = await supabaseAdmin
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
+type DbClient = SupabaseClient<Database>;
+
+function getDbClient(context?: { supabase?: DbClient }): DbClient {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY_PUBLIC
+    ? (supabaseAdmin as DbClient)
+    : (context?.supabase as DbClient);
+}
+
+async function assertStaff(db: DbClient, userId: string) {
+  const { data: roles, error } = await db.from("user_roles").select("role").eq("user_id", userId);
   if (error) throw new Error(error.message);
   const ok = (roles ?? []).some(
     (r) => r.role === "admin" || r.role === "super_admin" || r.role === "manager",
@@ -27,14 +34,19 @@ async function assertStaff(userId: string) {
 
 const BUCKET = "chapter-images";
 
-async function uploadBytes(path: string, bytes: Uint8Array, contentType: string): Promise<string> {
-  const { error } = await supabaseAdmin.storage.from(BUCKET).upload(path, bytes, {
+async function uploadBytes(
+  db: DbClient,
+  path: string,
+  bytes: Uint8Array,
+  contentType: string,
+): Promise<string> {
+  const { error } = await db.storage.from(BUCKET).upload(path, bytes, {
     contentType,
     upsert: true,
     cacheControl: "31536000",
   });
   if (error) throw new Error(`Upload failed: ${error.message}`);
-  const { data } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);
+  const { data } = db.storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
 
@@ -45,16 +57,12 @@ function extFromContentType(ct: string): string {
   return "jpg";
 }
 
-async function appendLog(jobId: string, line: string) {
-  const { data: row } = await supabaseAdmin
-    .from("import_jobs")
-    .select("logs")
-    .eq("id", jobId)
-    .maybeSingle();
+async function appendLog(db: DbClient, jobId: string, line: string) {
+  const { data: row } = await db.from("import_jobs").select("logs").eq("id", jobId).maybeSingle();
   const logs = [...((row?.logs as string[]) ?? []), `${new Date().toISOString()} ${line}`].slice(
     -200,
   );
-  await supabaseAdmin.from("import_jobs").update({ logs }).eq("id", jobId);
+  await db.from("import_jobs").update({ logs }).eq("id", jobId);
 }
 
 type JobPatch = Partial<{
@@ -66,8 +74,8 @@ type JobPatch = Partial<{
   completed_chapters: number;
 }>;
 
-async function setJob(jobId: string, patch: JobPatch) {
-  await supabaseAdmin.from("import_jobs").update(patch).eq("id", jobId);
+async function setJob(db: DbClient, jobId: string, patch: JobPatch) {
+  await db.from("import_jobs").update(patch).eq("id", jobId);
 }
 
 function slugify(value: string): string {
@@ -112,9 +120,10 @@ export const createImportJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => CreateSchema.parse(input))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.userId);
+    const db = getDbClient(context);
+    await assertStaff(db, context.userId);
 
-    const { data: row, error } = await supabaseAdmin
+    const { data: row, error } = await db
       .from("import_jobs")
       .insert({
         source_url: data.sourceUrl,
@@ -134,8 +143,9 @@ export const createImportJob = createServerFn({ method: "POST" })
 export const listImportJobs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertStaff(context.userId);
-    const { data, error } = await supabaseAdmin
+    const db = getDbClient(context);
+    await assertStaff(db, context.userId);
+    const { data, error } = await db
       .from("import_jobs")
       .select("*")
       .order("created_at", { ascending: false })
@@ -148,8 +158,9 @@ export const getImportJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ jobId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.userId);
-    const { data: job, error } = await supabaseAdmin
+    const db = getDbClient(context);
+    await assertStaff(db, context.userId);
+    const { data: job, error } = await db
       .from("import_jobs")
       .select("*")
       .eq("id", data.jobId)
@@ -174,9 +185,10 @@ export const runImportStep = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ jobId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.userId);
+    const db = getDbClient(context);
+    await assertStaff(db, context.userId);
 
-    const { data: job, error: jErr } = await supabaseAdmin
+    const { data: job, error: jErr } = await db
       .from("import_jobs")
       .select("*")
       .eq("id", data.jobId)
@@ -190,8 +202,8 @@ export const runImportStep = createServerFn({ method: "POST" })
     try {
       /* -------- STAGE 1: scrape series + chapter list -------- */
       if (job.status === "pending" || job.status === "scraping") {
-        await setJob(job.id, { status: "scraping", current_chapter: "Fetching series page…" });
-        await appendLog(job.id, `Scraping series ${job.source_url}`);
+        await setJob(db, job.id, { status: "scraping", current_chapter: "Fetching series page…" });
+        await appendLog(db, job.id, `Scraping series ${job.source_url}`);
 
         let scraped: ScrapedSeries;
         if (job.source_site === "mangago") {
@@ -201,10 +213,14 @@ export const runImportStep = createServerFn({ method: "POST" })
         }
 
         const scrapedChapters = scraped.chapters ?? [];
-        await appendLog(job.id, `Found "${scraped.title}" with ${scrapedChapters.length} chapters`);
+        await appendLog(
+          db,
+          job.id,
+          `Found "${scraped.title}" with ${scrapedChapters.length} chapters`,
+        );
 
         // Dedupe: if a series with this source_url already exists, reuse it.
-        const { data: existing } = await supabaseAdmin
+        const { data: existing } = await db
           .from("series")
           .select("id")
           .eq("source_url", scraped.sourceUrl)
@@ -213,7 +229,7 @@ export const runImportStep = createServerFn({ method: "POST" })
         let seriesId: string;
         if (existing) {
           seriesId = existing.id;
-          await appendLog(job.id, `Reusing existing series row ${seriesId}`);
+          await appendLog(db, job.id, `Reusing existing series row ${seriesId}`);
         } else {
           // Upload cover
           let coverPublicUrl: string | null = null;
@@ -222,12 +238,14 @@ export const runImportStep = createServerFn({ method: "POST" })
               const { bytes, contentType } = await downloadImage(scraped.coverUrl, job.source_url);
               const ext = extFromContentType(contentType);
               coverPublicUrl = await uploadBytes(
+                db,
                 `import/${scraped.slug}/cover.${ext}`,
                 bytes,
                 contentType,
               );
             } catch (err) {
               await appendLog(
+                db,
                 job.id,
                 `Cover download failed: ${(err as Error).message} (continuing)`,
               );
@@ -237,7 +255,7 @@ export const runImportStep = createServerFn({ method: "POST" })
           // Make slug unique
           let slug = scraped.slug;
           for (let i = 2; i < 50; i++) {
-            const { data: clash } = await supabaseAdmin
+            const { data: clash } = await db
               .from("series")
               .select("id")
               .eq("slug", slug)
@@ -246,7 +264,7 @@ export const runImportStep = createServerFn({ method: "POST" })
             slug = `${scraped.slug}-${i}`;
           }
 
-          const { data: created, error: cErr } = await supabaseAdmin
+          const { data: created, error: cErr } = await db
             .from("series")
             .insert({
               title: scraped.title,
@@ -263,19 +281,19 @@ export const runImportStep = createServerFn({ method: "POST" })
             .single();
           if (cErr) throw new Error(`Create series failed: ${cErr.message}`);
           seriesId = created.id;
-          await appendLog(job.id, `Created series ${seriesId} (slug: ${slug})`);
+          await appendLog(db, job.id, `Created series ${seriesId} (slug: ${slug})`);
         }
 
         // Insert any missing chapter rows (no pages yet).
         for (const ch of scrapedChapters) {
-          const { data: existingCh } = await supabaseAdmin
+          const { data: existingCh } = await db
             .from("chapters")
             .select("id")
             .eq("series_id", seriesId)
             .eq("number", ch.number)
             .maybeSingle();
           if (!existingCh) {
-            await supabaseAdmin.from("chapters").insert({
+            await db.from("chapters").insert({
               series_id: seriesId,
               number: ch.number,
               title: ch.title,
@@ -283,23 +301,20 @@ export const runImportStep = createServerFn({ method: "POST" })
               source_url: ch.sourceUrl,
             });
           } else if (ch.sourceUrl) {
-            await supabaseAdmin
-              .from("chapters")
-              .update({ source_url: ch.sourceUrl })
-              .eq("id", existingCh.id);
+            await db.from("chapters").update({ source_url: ch.sourceUrl }).eq("id", existingCh.id);
           }
         }
 
-        await setJob(job.id, {
+        await setJob(db, job.id, {
           series_id: seriesId,
           status: "importing_chapters",
           total_chapters: scrapedChapters.length,
           completed_chapters: 0,
           current_chapter: "Ready to import chapters",
         });
-        await appendLog(job.id, `Series ready. Importing ${scrapedChapters.length} chapters…`);
+        await appendLog(db, job.id, `Series ready. Importing ${scrapedChapters.length} chapters…`);
 
-        const { data: refreshed } = await supabaseAdmin
+        const { data: refreshed } = await db
           .from("import_jobs")
           .select("*")
           .eq("id", job.id)
@@ -312,7 +327,7 @@ export const runImportStep = createServerFn({ method: "POST" })
         if (!job.series_id) throw new Error("Job missing series_id");
 
         // Find next chapter with a source_url and no pages.
-        const { data: chapters } = await supabaseAdmin
+        const { data: chapters } = await db
           .from("chapters")
           .select("id, number, title, source_url")
           .eq("series_id", job.series_id)
@@ -323,7 +338,7 @@ export const runImportStep = createServerFn({ method: "POST" })
         let next: (typeof all)[number] | null = null;
         let completed = 0;
         for (const ch of all) {
-          const { count } = await supabaseAdmin
+          const { count } = await db
             .from("chapter_pages")
             .select("id", { count: "exact", head: true })
             .eq("chapter_id", ch.id);
@@ -335,13 +350,13 @@ export const runImportStep = createServerFn({ method: "POST" })
         }
 
         if (!next) {
-          await setJob(job.id, {
+          await setJob(db, job.id, {
             status: "done",
             completed_chapters: all.length,
             current_chapter: null,
           });
-          await appendLog(job.id, `All chapters imported. Job done.`);
-          const { data: refreshed } = await supabaseAdmin
+          await appendLog(db, job.id, `All chapters imported. Job done.`);
+          const { data: refreshed } = await db
             .from("import_jobs")
             .select("*")
             .eq("id", job.id)
@@ -349,15 +364,15 @@ export const runImportStep = createServerFn({ method: "POST" })
           return { job: refreshed };
         }
 
-        await setJob(job.id, {
+        await setJob(db, job.id, {
           completed_chapters: completed,
           current_chapter: `Ch.${next.number}${next.title ? ` — ${next.title}` : ""}`,
         });
-        await appendLog(job.id, `Importing Ch.${next.number} from ${next.source_url}`);
+        await appendLog(db, job.id, `Importing Ch.${next.number} from ${next.source_url}`);
 
         // Scrape image URLs
         const imgs = await scrapeMangagoChapterImages(next.source_url!);
-        await appendLog(job.id, `Found ${imgs.length} images for Ch.${next.number}`);
+        await appendLog(db, job.id, `Found ${imgs.length} images for Ch.${next.number}`);
 
         // Download + upload each, insert chapter_pages
         let pageNum = 1;
@@ -370,8 +385,8 @@ export const runImportStep = createServerFn({ method: "POST" })
               4,
               "0",
             )}.${ext}`;
-            const publicUrl = await uploadBytes(path, bytes, contentType);
-            await supabaseAdmin.from("chapter_pages").insert({
+            const publicUrl = await uploadBytes(db, path, bytes, contentType);
+            await db.from("chapter_pages").insert({
               chapter_id: next.id,
               page_number: pageNum,
               image_url: publicUrl,
@@ -379,21 +394,23 @@ export const runImportStep = createServerFn({ method: "POST" })
             pageNum++;
           } catch (err) {
             await appendLog(
+              db,
               job.id,
               `Page ${pageNum} failed for Ch.${next.number}: ${(err as Error).message}`,
             );
           }
         }
 
-        await setJob(job.id, {
+        await setJob(db, job.id, {
           completed_chapters: completed + 1,
         });
         await appendLog(
+          db,
           job.id,
           `Ch.${next.number} done (${pageNum - 1}/${imgs.length} pages saved)`,
         );
 
-        const { data: refreshed } = await supabaseAdmin
+        const { data: refreshed } = await db
           .from("import_jobs")
           .select("*")
           .eq("id", job.id)
@@ -405,9 +422,9 @@ export const runImportStep = createServerFn({ method: "POST" })
       throw new Error(`Unknown job status: ${job.status}`);
     } catch (err) {
       const msg = (err as Error).message || String(err);
-      await appendLog(job.id, `ERROR: ${msg}`);
-      await setJob(job.id, { status: "failed", error: msg });
-      const { data: refreshed } = await supabaseAdmin
+      await appendLog(db, job.id, `ERROR: ${msg}`);
+      await setJob(db, job.id, { status: "failed", error: msg });
+      const { data: refreshed } = await db
         .from("import_jobs")
         .select("*")
         .eq("id", job.id)
@@ -422,8 +439,9 @@ export const cancelImportJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ jobId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.userId);
-    await setJob(data.jobId, { status: "failed", error: "Cancelled by user" });
+    const db = getDbClient(context);
+    await assertStaff(db, context.userId);
+    await setJob(db, data.jobId, { status: "failed", error: "Cancelled by user" });
     return { ok: true };
   });
 
@@ -485,7 +503,7 @@ const ScrapeSeriesResponseSchema = z.object({
   ),
 });
 
-async function importGenericSeries(data: GenericSeriesImport) {
+async function importGenericSeries(db: DbClient, data: GenericSeriesImport) {
   const chapterPayloads = data.chapters?.length
     ? data.chapters
     : data.imageUrls?.length
@@ -500,7 +518,7 @@ async function importGenericSeries(data: GenericSeriesImport) {
   let seriesSlug = baseSlug || "series";
 
   if (data.sourceUrl) {
-    const { data: existing, error } = await supabaseAdmin
+    const { data: existing, error } = await db
       .from("series")
       .select("id, slug")
       .eq("source_url", data.sourceUrl)
@@ -509,7 +527,7 @@ async function importGenericSeries(data: GenericSeriesImport) {
     if (existing) {
       seriesId = existing.id;
       seriesSlug = existing.slug;
-      const { error: updateError } = await supabaseAdmin
+      const { error: updateError } = await db
         .from("series")
         .update({
           title: data.title,
@@ -528,7 +546,7 @@ async function importGenericSeries(data: GenericSeriesImport) {
   if (!seriesId) {
     let candidate = seriesSlug;
     for (let i = 2; ; i++) {
-      const { data: clash, error } = await supabaseAdmin
+      const { data: clash, error } = await db
         .from("series")
         .select("id")
         .eq("slug", candidate)
@@ -541,7 +559,7 @@ async function importGenericSeries(data: GenericSeriesImport) {
       candidate = `${baseSlug || "series"}-${i}`;
     }
 
-    const { data: created, error } = await supabaseAdmin
+    const { data: created, error } = await db
       .from("series")
       .insert({
         title: data.title,
@@ -571,7 +589,7 @@ async function importGenericSeries(data: GenericSeriesImport) {
     totalPages: number;
   }> = [];
   for (const chapter of chapterPayloads) {
-    const { data: existingChapter, error: chapterLookupError } = await supabaseAdmin
+    const { data: existingChapter, error: chapterLookupError } = await db
       .from("chapters")
       .select("id")
       .eq("series_id", resolvedSeriesId)
@@ -582,7 +600,7 @@ async function importGenericSeries(data: GenericSeriesImport) {
     let chapterId: string;
     if (existingChapter) {
       chapterId = existingChapter.id;
-      const { error: updateError } = await supabaseAdmin
+      const { error: updateError } = await db
         .from("chapters")
         .update({
           title: chapter.title ?? null,
@@ -591,13 +609,13 @@ async function importGenericSeries(data: GenericSeriesImport) {
         })
         .eq("id", chapterId);
       if (updateError) throw new Error(`Update chapter failed: ${updateError.message}`);
-      const { error: deletePagesError } = await supabaseAdmin
+      const { error: deletePagesError } = await db
         .from("chapter_pages")
         .delete()
         .eq("chapter_id", chapterId);
       if (deletePagesError) throw new Error(deletePagesError.message);
     } else {
-      const { data: createdChapter, error: createChapterError } = await supabaseAdmin
+      const { data: createdChapter, error: createChapterError } = await db
         .from("chapters")
         .insert({
           series_id: resolvedSeriesId,
@@ -629,8 +647,8 @@ async function importGenericSeries(data: GenericSeriesImport) {
           4,
           "0",
         )}.${ext}`;
-        const publicUrl = await uploadBytes(path, bytes, contentType);
-        const { error: pageError } = await supabaseAdmin.from("chapter_pages").insert({
+        const publicUrl = await uploadBytes(db, path, bytes, contentType);
+        const { error: pageError } = await db.from("chapter_pages").insert({
           chapter_id: chapterId,
           page_number: pageNumber,
           image_url: publicUrl,
@@ -725,18 +743,20 @@ export const importSeriesFromJson = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => GenericSeriesImportSchema.parse(input))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.userId);
-    return importGenericSeries(data);
+    const db = getDbClient(context);
+    await assertStaff(db, context.userId);
+    return importGenericSeries(db, data);
   });
 
 export const importSeriesFromSourceApi = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => ScrapeSeriesRequestSchema.parse(input))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.userId);
+    const db = getDbClient(context);
+    await assertStaff(db, context.userId);
     const scraped = await fetchScrapeSeries(data);
     const mapped = mapScrapeResponseToImport(scraped);
-    return importGenericSeries(mapped);
+    return importGenericSeries(db, mapped);
   });
 
 const JsonUrlImportSchema = z.object({
@@ -747,7 +767,8 @@ export const importSeriesFromJsonUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => JsonUrlImportSchema.parse(input))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.userId);
+    const db = getDbClient(context);
+    await assertStaff(db, context.userId);
 
     const response = await fetch(data.url, {
       headers: {
@@ -769,5 +790,5 @@ export const importSeriesFromJsonUrl = createServerFn({ method: "POST" })
     }
 
     const mapped = GenericSeriesImportSchema.parse(parsed);
-    return importGenericSeries(mapped);
+    return importGenericSeries(db, mapped);
   });
