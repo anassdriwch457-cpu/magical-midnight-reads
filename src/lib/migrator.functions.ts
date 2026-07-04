@@ -89,6 +89,7 @@ function slugify(value: string): string {
 async function downloadRemoteImage(
   url: string,
   referer?: string,
+  scrapeId?: string,
 ): Promise<{
   bytes: Uint8Array;
   contentType: string;
@@ -102,19 +103,67 @@ async function downloadRemoteImage(
     headers.Referer = referer;
     headers.Origin = new URL(referer).origin;
   }
-  const res = await fetch(url, {
-    headers,
-    redirect: "follow",
-  });
-  if (!res.ok) throw new Error(`Image fetch failed (${res.status}): ${url}`);
-  const contentType = res.headers.get("content-type") || "image/jpeg";
-  if (contentType.startsWith("text/html")) {
-    throw new Error(`Expected an image URL, got HTML instead: ${url}`);
-  }
-  return {
-    bytes: new Uint8Array(await res.arrayBuffer()),
-    contentType,
+  const fetchDirect = async () => {
+    const res = await fetch(url, {
+      headers,
+      redirect: "follow",
+    });
+    if (!res.ok) throw new Error(`Image fetch failed (${res.status}): ${url}`);
+    const contentType = res.headers.get("content-type") || "image/jpeg";
+    if (contentType.startsWith("text/html")) {
+      throw new Error(`Expected an image URL, got HTML instead: ${url}`);
+    }
+    return {
+      bytes: new Uint8Array(await res.arrayBuffer()),
+      contentType,
+    };
   };
+
+  try {
+    return await fetchDirect();
+  } catch (error) {
+    const status = error instanceof Error ? error.message : String(error);
+    if (!scrapeId || !status.includes("(403)")) {
+      throw error;
+    }
+
+    const interactOutput = await fetchFirecrawlInteract(scrapeId, {
+      code: [
+        `const imageUrl = ${JSON.stringify(url)};`,
+        `const referer = ${JSON.stringify(referer ?? "")};`,
+        "const headers = {",
+        '  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",',
+        '  Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",',
+        "};",
+        "if (referer) {",
+        "  headers.Referer = referer;",
+        "  headers.Origin = new URL(referer).origin;",
+        "}",
+        "const response = await fetch(imageUrl, { headers, redirect: 'follow' });",
+        "if (!response.ok) throw new Error(`Image fetch failed (${response.status}): ${imageUrl}`);",
+        "const contentType = response.headers.get('content-type') || 'image/jpeg';",
+        "const bytes = new Uint8Array(await response.arrayBuffer());",
+        "let binary = '';",
+        "for (const byte of bytes) binary += String.fromCharCode(byte);",
+        "const base64 = btoa(binary);",
+        "JSON.stringify({ contentType, dataUrl: `data:${contentType};base64,${base64}` });",
+      ].join("\n"),
+      language: "node",
+      timeout: 120,
+    });
+    const parsed = parseJsonObjectFromText(interactOutput);
+    const dataUrl = typeof parsed?.dataUrl === "string" ? parsed.dataUrl : "";
+    if (!dataUrl.startsWith("data:")) {
+      throw error;
+    }
+    const match = dataUrl.match(/^data:([^;,]+)?(;base64)?,(.*)$/s);
+    if (!match) {
+      throw error;
+    }
+    const contentType = match[1] || "image/jpeg";
+    const base64 = match[3] || "";
+    return { bytes: new Uint8Array(Buffer.from(base64, "base64")), contentType };
+  }
 }
 
 /* ============================== CREATE JOB ============================== */
@@ -459,6 +508,7 @@ const GenericChapterSchema = z.object({
   price: z.number().min(0).max(100000).optional().default(0),
   imageUrls: z.array(z.string().url().max(2000)).min(1).max(500),
   sourceUrl: z.string().url().max(500).nullable().optional(),
+  scrapeId: z.string().max(200).nullable().optional(),
 });
 
 const GenericSeriesImportSchema = z.object({
@@ -729,6 +779,24 @@ function parseJsonArrayFromText(text: string): string[] {
     .filter((line) => /^https?:\/\//i.test(line));
 }
 
+function parseJsonObjectFromText(text: string): Record<string, unknown> | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  const fenceMatch = trimmed.match(/```json\s*([\s\S]*?)\s*```/i);
+  const candidate = (fenceMatch?.[1] ?? trimmed).trim();
+  try {
+    const parsed = JSON.parse(candidate);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // fall through
+  }
+
+  return null;
+}
+
 async function importGenericSeries(db: DbClient, data: GenericSeriesImport) {
   const chapterPayloads = data.chapters?.length
     ? data.chapters
@@ -869,7 +937,11 @@ async function importGenericSeries(db: DbClient, data: GenericSeriesImport) {
         continue;
       }
       try {
-        const { bytes, contentType } = await downloadRemoteImage(url, chapter.sourceUrl);
+        const { bytes, contentType } = await downloadRemoteImage(
+          url,
+          chapter.sourceUrl,
+          chapter.scrapeId ?? undefined,
+        );
         const ext = extFromContentType(contentType);
         const path = `import/${seriesSlug}/ch-${chapter.number}/p-${String(pageNumber).padStart(
           4,
@@ -966,6 +1038,7 @@ async function scrapeSeriesWithFirecrawl(
       title: chapter.title,
       price: 0,
       sourceUrl: chapter.sourceUrl,
+      scrapeId,
       imageUrls,
     });
   }
