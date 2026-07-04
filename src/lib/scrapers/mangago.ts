@@ -125,8 +125,7 @@ export async function scrapeMangagoSeries(seriesUrl: string): Promise<ScrapedSer
     /<table class="listing"[^>]*id="chapter_table"[^>]*>([\s\S]*?)<\/table>/,
   );
   const tableHtml = tableMatch ? tableMatch[1] : html;
-  const chRe =
-    /<a class="chico"[^>]*href="([^"]+)"[^>]*>\s*(?:<b[^>]*>([^<]*)<\/b>)?\s*([^<]*)/g;
+  const chRe = /<a class="chico"[^>]*href="([^"]+)"[^>]*>\s*(?:<b[^>]*>([^<]*)<\/b>)?\s*([^<]*)/g;
   let cm: RegExpExecArray | null;
   const seen = new Set<string>();
   while ((cm = chRe.exec(tableHtml)) !== null) {
@@ -139,7 +138,7 @@ export async function scrapeMangagoSeries(seriesUrl: string): Promise<ScrapedSer
     const numMatch = bold.match(/Ch\.?\s*([\d.]+)/i);
     const number = numMatch ? Number(numMatch[1]) : NaN;
     if (!Number.isFinite(number)) continue;
-    const cleanTrail = trail.replace(/^[\s:.\-]+/, "").trim();
+    const cleanTrail = trail.replace(/^[\s:.-]+/, "").trim();
     chapters.push({
       number,
       title: cleanTrail || null,

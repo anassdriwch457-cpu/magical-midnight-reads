@@ -1,14 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   createImportJob,
+  importSeriesFromJson,
+  importSeriesFromJsonUrl,
+  importSeriesFromSourceApi,
   listImportJobs,
   runImportStep,
   cancelImportJob,
-} from "@/server/migrator.functions";
+} from "@/lib/migrator.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -47,9 +51,41 @@ type Job = {
 };
 
 const SITES = [{ id: "mangago", label: "Mangago.me" }] as const;
+const SOURCE_API_SITES = [
+  { id: "mangabuddy", label: "MangaBuddy" },
+  { id: "kunmanga", label: "KunManga" },
+  { id: "comix", label: "Comix.to" },
+] as const;
+
+const GENERIC_IMPORT_EXAMPLE = {
+  title: "Example Series",
+  description: "Imported from a JSON payload",
+  author: "Author Name",
+  slug: "example-series",
+  type: "manga",
+  status: "ongoing",
+  chapters: [
+    {
+      number: 1,
+      title: "Chapter 1",
+      imageUrls: ["https://example.com/page-1.jpg", "https://example.com/page-2.jpg"],
+    },
+  ],
+};
+
+function getImportedChapterCount(result: unknown) {
+  if (!result || typeof result !== "object") {
+    return 0;
+  }
+  const chapters = (result as { chapters?: unknown }).chapters;
+  return Array.isArray(chapters) ? chapters.length : 0;
+}
 
 export function MigratorView() {
   const create = useServerFn(createImportJob);
+  const importJson = useServerFn(importSeriesFromJson);
+  const importJsonUrl = useServerFn(importSeriesFromJsonUrl);
+  const importSourceApi = useServerFn(importSeriesFromSourceApi);
   const list = useServerFn(listImportJobs);
   const step = useServerFn(runImportStep);
   const cancel = useServerFn(cancelImportJob);
@@ -57,23 +93,33 @@ export function MigratorView() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceSite, setSourceSite] = useState<string>("mangago");
   const [creating, setCreating] = useState(false);
+  const [importingJson, setImportingJson] = useState(false);
+  const [importingSourceApi, setImportingSourceApi] = useState(false);
+  const [sourceApiBatchUrls, setSourceApiBatchUrls] = useState("");
+  const [importingBatch, setImportingBatch] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const activeRef = useRef<string | null>(null);
   const stoppedRef = useRef<Set<string>>(new Set());
+  const [jsonPayload, setJsonPayload] = useState(JSON.stringify(GENERIC_IMPORT_EXAMPLE, null, 2));
+  const [jsonSourceUrl, setJsonSourceUrl] = useState("");
+  const [sourceApiUrl, setSourceApiUrl] = useState("");
+  const [sourceApiSite, setSourceApiSite] = useState<string>("comix");
+  const [includeChapterImages, setIncludeChapterImages] = useState(true);
+  const [chapterLimit, setChapterLimit] = useState(50);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       const res = await list();
       setJobs((res.jobs as Job[]) ?? []);
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [list]);
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
 
   const runUntilDone = async (jobId: string) => {
     activeRef.current = jobId;
@@ -132,6 +178,116 @@ export function MigratorView() {
     }
   };
 
+  const onImportJson = async () => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonPayload);
+    } catch {
+      toast.error("Paste valid JSON");
+      return;
+    }
+
+    setImportingJson(true);
+    try {
+      const res = await importJson({ data: parsed });
+      const chapters = (res.chapters as Array<{ chapterNumber: number }>) ?? [];
+      toast.success(`Imported ${chapters.length} chapter${chapters.length === 1 ? "" : "s"}`);
+      await refresh();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setImportingJson(false);
+    }
+  };
+
+  const onImportJsonUrl = async () => {
+    if (!jsonSourceUrl.trim()) {
+      toast.error("Enter a JSON URL");
+      return;
+    }
+
+    setImportingJson(true);
+    try {
+      const res = await importJsonUrl({ data: { url: jsonSourceUrl.trim() } });
+      const chapters = getImportedChapterCount(res);
+      toast.success(`Imported ${chapters} chapter${chapters === 1 ? "" : "s"}`);
+      setJsonSourceUrl("");
+      await refresh();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setImportingJson(false);
+    }
+  };
+
+  const onImportSourceApi = async () => {
+    if (!sourceApiUrl.trim()) {
+      toast.error("Enter a series URL");
+      return;
+    }
+    setImportingSourceApi(true);
+    try {
+      const res = await importSourceApi({
+        data: {
+          url: sourceApiUrl.trim(),
+          site: sourceApiSite as "mangabuddy" | "kunmanga" | "comix",
+          includeChapterImages,
+          chapterLimit,
+        },
+      });
+      const chapters = getImportedChapterCount(res);
+      toast.success(`Imported ${chapters} chapter${chapters === 1 ? "" : "s"}`);
+      setSourceApiUrl("");
+      await refresh();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setImportingSourceApi(false);
+    }
+  };
+
+  const onImportSourceApiBatch = async () => {
+    const urls = sourceApiBatchUrls
+      .split(/[\n,]+/)
+      .map((url) => url.trim())
+      .filter(Boolean);
+
+    if (urls.length === 0) {
+      toast.error("Add at least one series URL");
+      return;
+    }
+
+    setImportingBatch(true);
+    let ok = 0;
+    let failed = 0;
+    try {
+      for (const url of urls) {
+        try {
+          await importSourceApi({
+            data: {
+              url,
+              site: sourceApiSite as "mangabuddy" | "kunmanga" | "comix",
+              includeChapterImages,
+              chapterLimit,
+            },
+          });
+          ok++;
+        } catch (err) {
+          failed++;
+          console.error(err);
+        }
+      }
+
+      toast.success(
+        failed === 0 ? `Imported ${ok} series` : `Imported ${ok} series, ${failed} failed`,
+      );
+      setSourceApiBatchUrls("");
+      await refresh();
+    } finally {
+      setImportingBatch(false);
+    }
+  };
+
   const onResume = (jobId: string) => {
     stoppedRef.current.delete(jobId);
     runUntilDone(jobId);
@@ -163,9 +319,9 @@ export function MigratorView() {
           <Download className="h-6 w-6 text-primary" /> Quick Import / Migrator
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Paste a series URL from a supported site. The tool fetches series info, copies
-          the cover and every chapter image to your Cloud storage, and creates the records
-          here. Only import content you have rights to host.
+          Paste a series URL from a supported site. The tool fetches series info, copies the cover
+          and every chapter image to your Cloud storage, and creates the records here. Only import
+          content you have rights to host.
         </p>
       </header>
 
@@ -211,13 +367,154 @@ export function MigratorView() {
         </div>
         <p className="text-xs text-muted-foreground flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
-          Imports run in the background. You can close this page — the job continues
-          on the next time it&apos;s resumed. Pause if you want to stop fetching.
+          Imports run in the background. You can close this page — the job continues on the next
+          time it&apos;s resumed. Pause if you want to stop fetching.
         </p>
       </div>
 
       {/* Manual URL upload (Drive / Gofile) */}
       <ChapterUrlUploadView />
+
+      <div className="rounded-xl border border-border bg-card/50 backdrop-blur p-6 space-y-4">
+        <div>
+          <h3 className="text-lg font-bold">Series Link Import</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Fetch series data from your scrape API, then save it into Pearltoon. This uses the
+            server-side scraper key from project secrets.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-[1fr_220px]">
+          <div className="space-y-1.5">
+            <Label htmlFor="source-api-url">Series URL</Label>
+            <Input
+              id="source-api-url"
+              placeholder="https://comix.to/title/your-series"
+              value={sourceApiUrl}
+              onChange={(e) => setSourceApiUrl(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="source-api-site">Site</Label>
+            <Select value={sourceApiSite} onValueChange={setSourceApiSite}>
+              <SelectTrigger id="source-api-site">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SOURCE_API_SITES.map((site) => (
+                  <SelectItem key={site.id} value={site.id}>
+                    {site.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex items-center gap-2 rounded-md border border-border bg-background/50 px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              checked={includeChapterImages}
+              onChange={(e) => setIncludeChapterImages(e.target.checked)}
+            />
+            Include chapter images
+          </label>
+          <div className="space-y-1.5">
+            <Label htmlFor="chapter-limit">Chapter limit</Label>
+            <Input
+              id="chapter-limit"
+              type="number"
+              min={1}
+              max={200}
+              value={chapterLimit}
+              onChange={(e) => setChapterLimit(Number(e.target.value) || 50)}
+            />
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={onImportSourceApi} disabled={importingSourceApi}>
+            {importingSourceApi ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Import from Source API
+          </Button>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="source-api-batch">Batch series URLs</Label>
+          <Textarea
+            id="source-api-batch"
+            value={sourceApiBatchUrls}
+            onChange={(e) => setSourceApiBatchUrls(e.target.value)}
+            rows={5}
+            placeholder={"https://example.com/series/1\nhttps://example.com/series/2"}
+            className="font-mono text-xs"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={onImportSourceApiBatch} disabled={importingBatch}>
+            {importingBatch ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Import batch
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card/50 backdrop-blur p-6 space-y-4">
+        <div>
+          <h3 className="text-lg font-bold">Generic JSON Import</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Paste series metadata, or point this at a public JSON export URL. The payload can
+            include <code>chapters</code> or a top-level <code>imageUrls</code> array for chapter 1.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+          <div className="space-y-1.5">
+            <Label htmlFor="json-source-url">JSON URL</Label>
+            <Input
+              id="json-source-url"
+              placeholder="https://example.com/export/series.json"
+              value={jsonSourceUrl}
+              onChange={(e) => setJsonSourceUrl(e.target.value)}
+            />
+          </div>
+          <div className="flex items-end">
+            <Button onClick={onImportJsonUrl} disabled={importingJson} className="w-full sm:w-auto">
+              {importingJson ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Globe className="h-4 w-4" />
+              )}
+              Import JSON URL
+            </Button>
+          </div>
+        </div>
+        <Textarea
+          value={jsonPayload}
+          onChange={(e) => setJsonPayload(e.target.value)}
+          rows={14}
+          className="font-mono text-xs"
+        />
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={onImportJson} disabled={importingJson}>
+            {importingJson ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Import JSON
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setJsonPayload(JSON.stringify(GENERIC_IMPORT_EXAMPLE, null, 2))}
+          >
+            Load example
+          </Button>
+        </div>
+      </div>
 
       {/* Jobs list */}
       <div className="space-y-3">
@@ -327,9 +624,7 @@ function JobCard({
             {job.source_url}
           </a>
           {job.current_chapter && (
-            <div className="text-xs text-muted-foreground mt-1">
-              Current: {job.current_chapter}
-            </div>
+            <div className="text-xs text-muted-foreground mt-1">Current: {job.current_chapter}</div>
           )}
         </div>
         <div className="flex items-center gap-2">

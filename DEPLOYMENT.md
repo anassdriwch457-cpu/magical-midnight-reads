@@ -122,6 +122,18 @@ Do **not** create a `_redirects` file with `/* /index.html 200`. This project ha
 4. Deploy: `npx netlify deploy --build --prod` (or push to a branch connected to the site).
 5. After first deploy, point the Stripe live webhook at `https://<your-site>.netlify.app/api/public/stripe-webhook`.
 
+### Automatic deploys from git
+
+The repo includes `.github/workflows/auto-deploy.yml`:
+- runs on pushes to `main`
+- installs with Node 20 + `npm ci`
+- builds the app
+- deploys to Netlify when both secrets are present:
+  - `NETLIFY_AUTH_TOKEN`
+  - `NETLIFY_SITE_ID`
+
+If those secrets are missing, the workflow still builds and skips the deploy step.
+
 ### Verify routing works
 
 After deploy, hard-refresh `/series/<slug>`, `/topup`, and any other deep link. They should all render correctly. If a route 404s, the route file under `src/routes/` is missing — fix the route file, do not add a `_redirects` rewrite.

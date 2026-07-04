@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  uploadChapterFromUrls,
-  listSeriesForUpload,
-} from "@/server/chapter-upload.functions";
+import { uploadChapterFromUrls, listSeriesForUpload } from "@/lib/chapter-upload.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -124,12 +121,7 @@ export function ChapterUrlUploadView() {
         </div>
         <div className="space-y-1.5">
           <Label>Price (coins, 0 = free)</Label>
-          <Input
-            type="number"
-            min={0}
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-          />
+          <Input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Chapter Title (optional)</Label>
