@@ -7,14 +7,14 @@ const SUPABASE_URL =
   (typeof process !== "undefined"
     ? (process.env?.SUPABASE_URL as string | undefined)
     : undefined) ||
-  "https://ufazpefxyapzttdngyhi.supabase.co";
+  "https://debulpewzgatsibelxpg.supabase.co";
 
 const SUPABASE_PUBLISHABLE_KEY =
   (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ||
   (typeof process !== "undefined"
     ? (process.env?.SUPABASE_PUBLISHABLE_KEY as string | undefined)
     : undefined) ||
-  "sb_publishable_AIh9GoQr1NEY5izB5KVGC7_Q7qwW_2R";
+  "sb_publishable_YbS6zxPuuRZBIVbrVPxcUw_cquFQlDi";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

@@ -1,6 +1,6 @@
 // Public placeholder hosted in the public storage bucket so it works in production.
 export const PLACEHOLDER_COVER =
-  "https://ufazpefxyapzttdngyhi.supabase.co/storage/v1/object/public/chapter-images/seed/placeholder.png";
+  "https://debulpewzgatsibelxpg.supabase.co/storage/v1/object/public/chapter-images/seed/placeholder.png";
 
 /**
  * Resolve any stored image path/URL into a real, loadable URL.
@@ -13,7 +13,7 @@ export function resolveImage(url: string | null | undefined): string {
   if (/^https?:\/\//i.test(url)) return url;
   if (url.startsWith("/src/assets/")) {
     const file = url.replace(/^\/src\/assets\//, "");
-    return `https://ufazpefxyapzttdngyhi.supabase.co/storage/v1/object/public/chapter-images/seed/${file}`;
+    return `https://debulpewzgatsibelxpg.supabase.co/storage/v1/object/public/chapter-images/seed/${file}`;
   }
   return url;
 }
