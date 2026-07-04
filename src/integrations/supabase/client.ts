@@ -14,7 +14,7 @@ const SUPABASE_PUBLISHABLE_KEY =
   (typeof process !== "undefined"
     ? (process.env?.SUPABASE_PUBLISHABLE_KEY as string | undefined)
     : undefined) ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJqd2R4Ym5zbnJhaHZvZ2N5eGxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0ODQyODgsImV4cCI6MjA5MzA2MDI4OH0.3RV7YSUo0_kf0K-UPsqYL1zRzq2aa7ZuEQ0UnjgVQq4";
+  "sb_publishable_AIh9GoQr1NEY5izB5KVGC7_Q7qwW_2R";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
