@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   createImportJob,
+  importSeriesFromJson,
   listImportJobs,
   runImportStep,
   cancelImportJob,
-} from "@/server/migrator.functions";
+} from "@/lib/migrator.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -48,8 +50,25 @@ type Job = {
 
 const SITES = [{ id: "mangago", label: "Mangago.me" }] as const;
 
+const GENERIC_IMPORT_EXAMPLE = {
+  title: "Example Series",
+  description: "Imported from a JSON payload",
+  author: "Author Name",
+  slug: "example-series",
+  type: "manga",
+  status: "ongoing",
+  chapters: [
+    {
+      number: 1,
+      title: "Chapter 1",
+      imageUrls: ["https://example.com/page-1.jpg", "https://example.com/page-2.jpg"],
+    },
+  ],
+};
+
 export function MigratorView() {
   const create = useServerFn(createImportJob);
+  const importJson = useServerFn(importSeriesFromJson);
   const list = useServerFn(listImportJobs);
   const step = useServerFn(runImportStep);
   const cancel = useServerFn(cancelImportJob);
@@ -57,23 +76,25 @@ export function MigratorView() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceSite, setSourceSite] = useState<string>("mangago");
   const [creating, setCreating] = useState(false);
+  const [importingJson, setImportingJson] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const activeRef = useRef<string | null>(null);
   const stoppedRef = useRef<Set<string>>(new Set());
+  const [jsonPayload, setJsonPayload] = useState(JSON.stringify(GENERIC_IMPORT_EXAMPLE, null, 2));
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       const res = await list();
       setJobs((res.jobs as Job[]) ?? []);
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [list]);
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
 
   const runUntilDone = async (jobId: string) => {
     activeRef.current = jobId;
@@ -132,6 +153,28 @@ export function MigratorView() {
     }
   };
 
+  const onImportJson = async () => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonPayload);
+    } catch {
+      toast.error("Paste valid JSON");
+      return;
+    }
+
+    setImportingJson(true);
+    try {
+      const res = await importJson({ data: parsed });
+      const chapters = (res.chapters as Array<{ chapterNumber: number }>) ?? [];
+      toast.success(`Imported ${chapters.length} chapter${chapters.length === 1 ? "" : "s"}`);
+      await refresh();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setImportingJson(false);
+    }
+  };
+
   const onResume = (jobId: string) => {
     stoppedRef.current.delete(jobId);
     runUntilDone(jobId);
@@ -163,9 +206,9 @@ export function MigratorView() {
           <Download className="h-6 w-6 text-primary" /> Quick Import / Migrator
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Paste a series URL from a supported site. The tool fetches series info, copies
-          the cover and every chapter image to your Cloud storage, and creates the records
-          here. Only import content you have rights to host.
+          Paste a series URL from a supported site. The tool fetches series info, copies the cover
+          and every chapter image to your Cloud storage, and creates the records here. Only import
+          content you have rights to host.
         </p>
       </header>
 
@@ -211,13 +254,45 @@ export function MigratorView() {
         </div>
         <p className="text-xs text-muted-foreground flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
-          Imports run in the background. You can close this page — the job continues
-          on the next time it&apos;s resumed. Pause if you want to stop fetching.
+          Imports run in the background. You can close this page — the job continues on the next
+          time it&apos;s resumed. Pause if you want to stop fetching.
         </p>
       </div>
 
       {/* Manual URL upload (Drive / Gofile) */}
       <ChapterUrlUploadView />
+
+      <div className="rounded-xl border border-border bg-card/50 backdrop-blur p-6 space-y-4">
+        <div>
+          <h3 className="text-lg font-bold">Generic JSON Import</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Paste series metadata plus either <code>chapters</code> or a top-level{" "}
+            <code>imageUrls</code> array for chapter 1.
+          </p>
+        </div>
+        <Textarea
+          value={jsonPayload}
+          onChange={(e) => setJsonPayload(e.target.value)}
+          rows={14}
+          className="font-mono text-xs"
+        />
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={onImportJson} disabled={importingJson}>
+            {importingJson ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Import JSON
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setJsonPayload(JSON.stringify(GENERIC_IMPORT_EXAMPLE, null, 2))}
+          >
+            Load example
+          </Button>
+        </div>
+      </div>
 
       {/* Jobs list */}
       <div className="space-y-3">
@@ -327,9 +402,7 @@ function JobCard({
             {job.source_url}
           </a>
           {job.current_chapter && (
-            <div className="text-xs text-muted-foreground mt-1">
-              Current: {job.current_chapter}
-            </div>
+            <div className="text-xs text-muted-foreground mt-1">Current: {job.current_chapter}</div>
           )}
         </div>
         <div className="flex items-center gap-2">

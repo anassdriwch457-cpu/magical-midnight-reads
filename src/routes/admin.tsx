@@ -60,6 +60,7 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import JSZip from "jszip";
+import { MigratorView } from "@/components/admin/migrator-view";
 
 type Series = Tables<"series">;
 type Chapter = Tables<"chapters">;
@@ -175,11 +176,7 @@ ON CONFLICT DO NOTHING;`}</code>
           <MobileTabs tab={tab} setTab={setTab} allowedTabs={allowedTabs} />
           {tab === "analytics" && <AnalyticsView />}
           {tab === "content" && <ContentView />}
-          {tab === "migrator" && (
-            <div className="rounded-xl border border-border/50 bg-card/40 p-6 text-sm text-muted-foreground">
-              Migrator tools are temporarily unavailable.
-            </div>
-          )}
+          {tab === "migrator" && <MigratorView />}
           {tab === "users" && <UsersView canEditRoles={isSuperAdmin} />}
           {tab === "finance" && <FinanceView />}
           {tab === "payments" && <PaymentsView />}

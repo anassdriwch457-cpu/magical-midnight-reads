@@ -27,18 +27,12 @@ async function assertStaff(userId: string) {
 
 const BUCKET = "chapter-images";
 
-async function uploadBytes(
-  path: string,
-  bytes: Uint8Array,
-  contentType: string,
-): Promise<string> {
-  const { error } = await supabaseAdmin.storage
-    .from(BUCKET)
-    .upload(path, bytes, {
-      contentType,
-      upsert: true,
-      cacheControl: "31536000",
-    });
+async function uploadBytes(path: string, bytes: Uint8Array, contentType: string): Promise<string> {
+  const { error } = await supabaseAdmin.storage.from(BUCKET).upload(path, bytes, {
+    contentType,
+    upsert: true,
+    cacheControl: "31536000",
+  });
   if (error) throw new Error(`Upload failed: ${error.message}`);
   const { data } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
@@ -74,6 +68,37 @@ type JobPatch = Partial<{
 
 async function setJob(jobId: string, patch: JobPatch) {
   await supabaseAdmin.from("import_jobs").update(patch).eq("id", jobId);
+}
+
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+async function downloadRemoteImage(url: string): Promise<{
+  bytes: Uint8Array;
+  contentType: string;
+}> {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    },
+    redirect: "follow",
+  });
+  if (!res.ok) throw new Error(`Image fetch failed (${res.status}): ${url}`);
+  const contentType = res.headers.get("content-type") || "image/jpeg";
+  if (contentType.startsWith("text/html")) {
+    throw new Error(`Expected an image URL, got HTML instead: ${url}`);
+  }
+  return {
+    bytes: new Uint8Array(await res.arrayBuffer()),
+    contentType,
+  };
 }
 
 /* ============================== CREATE JOB ============================== */
@@ -196,10 +221,7 @@ export const runImportStep = createServerFn({ method: "POST" })
           let coverPublicUrl: string | null = null;
           if (scraped.coverUrl) {
             try {
-              const { bytes, contentType } = await downloadImage(
-                scraped.coverUrl,
-                job.source_url,
-              );
+              const { bytes, contentType } = await downloadImage(scraped.coverUrl, job.source_url);
               const ext = extFromContentType(contentType);
               coverPublicUrl = await uploadBytes(
                 `import/${scraped.slug}/cover.${ext}`,
@@ -405,4 +427,195 @@ export const cancelImportJob = createServerFn({ method: "POST" })
     await assertStaff(context.userId);
     await setJob(data.jobId, { status: "failed", error: "Cancelled by user" });
     return { ok: true };
+  });
+
+const GenericChapterSchema = z.object({
+  number: z.number().int().min(0).max(100000),
+  title: z.string().max(255).nullable().optional(),
+  price: z.number().min(0).max(100000).optional().default(0),
+  imageUrls: z.array(z.string().url().max(2000)).min(1).max(500),
+});
+
+const GenericSeriesImportSchema = z.object({
+  title: z.string().min(1).max(255),
+  description: z.string().max(5000).nullable().optional(),
+  author: z.string().max(255).nullable().optional(),
+  slug: z.string().max(200).nullable().optional(),
+  type: z.enum(["manga", "novel"]).optional().default("manga"),
+  status: z.enum(["ongoing", "completed", "hiatus"]).optional().default("ongoing"),
+  sourceUrl: z.string().url().max(500).nullable().optional(),
+  genres: z.array(z.string().min(1).max(50)).max(20).optional().default([]),
+  chapters: z.array(GenericChapterSchema).min(1).max(100).optional(),
+  imageUrls: z.array(z.string().url().max(2000)).min(1).max(500).optional(),
+});
+
+export const importSeriesFromJson = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => GenericSeriesImportSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.userId);
+
+    const chapterPayloads = data.chapters?.length
+      ? data.chapters
+      : data.imageUrls?.length
+        ? [{ number: 1, title: null, price: 0, imageUrls: data.imageUrls }]
+        : [];
+    if (chapterPayloads.length === 0) {
+      throw new Error("Provide chapters or imageUrls");
+    }
+
+    const baseSlug = slugify(data.slug?.trim() || data.title);
+    let seriesId: string | null = null;
+    let seriesSlug = baseSlug || "series";
+
+    if (data.sourceUrl) {
+      const { data: existing, error } = await supabaseAdmin
+        .from("series")
+        .select("id, slug")
+        .eq("source_url", data.sourceUrl)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (existing) {
+        seriesId = existing.id;
+        seriesSlug = existing.slug;
+        const { error: updateError } = await supabaseAdmin
+          .from("series")
+          .update({
+            title: data.title,
+            description: data.description ?? null,
+            author: data.author ?? null,
+            status: data.status,
+            type: data.type,
+            genres: data.genres,
+            source_url: data.sourceUrl,
+          })
+          .eq("id", seriesId);
+        if (updateError) throw new Error(`Update series failed: ${updateError.message}`);
+      }
+    }
+
+    if (!seriesId) {
+      let candidate = seriesSlug;
+      for (let i = 2; ; i++) {
+        const { data: clash, error } = await supabaseAdmin
+          .from("series")
+          .select("id")
+          .eq("slug", candidate)
+          .maybeSingle();
+        if (error) throw new Error(error.message);
+        if (!clash) {
+          seriesSlug = candidate;
+          break;
+        }
+        candidate = `${baseSlug || "series"}-${i}`;
+      }
+
+      const { data: created, error } = await supabaseAdmin
+        .from("series")
+        .insert({
+          title: data.title,
+          slug: seriesSlug,
+          description: data.description ?? null,
+          author: data.author ?? null,
+          status: data.status,
+          type: data.type,
+          genres: data.genres,
+          source_url: data.sourceUrl ?? null,
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(`Create series failed: ${error.message}`);
+      seriesId = created.id;
+    }
+
+    if (!seriesId) {
+      throw new Error("Failed to resolve series ID");
+    }
+    const resolvedSeriesId = seriesId;
+
+    const chapters = [];
+    for (const chapter of chapterPayloads) {
+      const { data: existingChapter, error: chapterLookupError } = await supabaseAdmin
+        .from("chapters")
+        .select("id")
+        .eq("series_id", resolvedSeriesId)
+        .eq("number", chapter.number)
+        .maybeSingle();
+      if (chapterLookupError) throw new Error(chapterLookupError.message);
+
+      let chapterId: string;
+      if (existingChapter) {
+        chapterId = existingChapter.id;
+        const { error: updateError } = await supabaseAdmin
+          .from("chapters")
+          .update({
+            title: chapter.title ?? null,
+            price: chapter.price ?? 0,
+            source_url: null,
+          })
+          .eq("id", chapterId);
+        if (updateError) throw new Error(`Update chapter failed: ${updateError.message}`);
+        const { error: deletePagesError } = await supabaseAdmin
+          .from("chapter_pages")
+          .delete()
+          .eq("chapter_id", chapterId);
+        if (deletePagesError) throw new Error(deletePagesError.message);
+      } else {
+        const { data: createdChapter, error: createChapterError } = await supabaseAdmin
+          .from("chapters")
+          .insert({
+            series_id: resolvedSeriesId,
+            number: chapter.number,
+            title: chapter.title ?? null,
+            price: chapter.price ?? 0,
+            source_url: null,
+          })
+          .select("id")
+          .single();
+        if (createChapterError)
+          throw new Error(`Create chapter failed: ${createChapterError.message}`);
+        chapterId = createdChapter.id;
+      }
+
+      let savedPages = 0;
+      let pageNumber = 1;
+      for (const rawUrl of chapter.imageUrls) {
+        const url = rawUrl.trim();
+        if (!url) {
+          pageNumber++;
+          continue;
+        }
+        try {
+          const { bytes, contentType } = await downloadRemoteImage(url);
+          const ext = extFromContentType(contentType);
+          const path = `import/${seriesSlug}/ch-${chapter.number}/p-${String(pageNumber).padStart(4, "0")}.${ext}`;
+          const publicUrl = await uploadBytes(path, bytes, contentType);
+          const { error: pageError } = await supabaseAdmin.from("chapter_pages").insert({
+            chapter_id: chapterId,
+            page_number: pageNumber,
+            image_url: publicUrl,
+          });
+          if (pageError) throw new Error(pageError.message);
+          savedPages++;
+        } catch (err) {
+          throw new Error(
+            `Chapter ${chapter.number} page ${pageNumber}: ${(err as Error).message}`,
+          );
+        }
+        pageNumber++;
+      }
+
+      chapters.push({
+        chapterNumber: chapter.number,
+        chapterId,
+        savedPages,
+        totalPages: chapter.imageUrls.length,
+      });
+    }
+
+    return {
+      seriesId,
+      slug: seriesSlug,
+      chapters,
+    };
   });
