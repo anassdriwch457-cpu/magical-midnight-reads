@@ -159,7 +159,7 @@ async function downloadRemoteImage(
 
 const CreateSchema = z.object({
   sourceUrl: z.string().url().max(500),
-  sourceSite: z.enum(["mangago"]),
+  sourceSite: z.enum(["mangago", "comix"]),
 });
 
 export const createImportJob = createServerFn({ method: "POST" })
@@ -251,114 +251,127 @@ export const runImportStep = createServerFn({ method: "POST" })
         await setJob(db, job.id, { status: "scraping", current_chapter: "Fetching series page…" });
         await appendLog(db, job.id, `Scraping series ${job.source_url}`);
 
-        let scraped: ScrapedSeries;
+        let seriesId: string;
+        let totalChapters = 0;
         if (job.source_site === "mangago") {
-          scraped = await scrapeMangagoSeries(job.source_url);
+          const scraped = await scrapeMangagoSeries(job.source_url);
+          const scrapedChapters = scraped.chapters ?? [];
+          totalChapters = scrapedChapters.length;
+          await appendLog(
+            db,
+            job.id,
+            `Found "${scraped.title}" with ${scrapedChapters.length} chapters`,
+          );
+
+          const { data: existing } = await db
+            .from("series")
+            .select("id")
+            .eq("source_url", scraped.sourceUrl)
+            .maybeSingle();
+
+          if (existing) {
+            seriesId = existing.id;
+            await appendLog(db, job.id, `Reusing existing series row ${seriesId}`);
+          } else {
+            let coverPublicUrl: string | null = null;
+            if (scraped.coverUrl) {
+              try {
+                const { bytes, contentType } = await downloadImage(
+                  scraped.coverUrl,
+                  job.source_url,
+                );
+                const ext = extFromContentType(contentType);
+                coverPublicUrl = await uploadBytes(
+                  db,
+                  `import/${scraped.slug}/cover.${ext}`,
+                  bytes,
+                  contentType,
+                );
+              } catch (err) {
+                await appendLog(
+                  db,
+                  job.id,
+                  `Cover download failed: ${(err as Error).message} (continuing)`,
+                );
+              }
+            }
+
+            let slug = scraped.slug;
+            for (let i = 2; i < 50; i++) {
+              const { data: clash } = await db
+                .from("series")
+                .select("id")
+                .eq("slug", slug)
+                .maybeSingle();
+              if (!clash) break;
+              slug = `${scraped.slug}-${i}`;
+            }
+
+            const { data: created, error: cErr } = await db
+              .from("series")
+              .insert({
+                title: scraped.title,
+                slug,
+                description: scraped.description || null,
+                cover_url: coverPublicUrl,
+                status: scraped.status,
+                type: "manga",
+                author: scraped.author,
+                genres: scraped.genres,
+                source_url: scraped.sourceUrl,
+              })
+              .select("id")
+              .single();
+            if (cErr) throw new Error(`Create series failed: ${cErr.message}`);
+            seriesId = created.id;
+            await appendLog(db, job.id, `Created series ${seriesId} (slug: ${slug})`);
+          }
+
+          for (const ch of scrapedChapters) {
+            const { data: existingCh } = await db
+              .from("chapters")
+              .select("id")
+              .eq("series_id", seriesId)
+              .eq("number", ch.number)
+              .maybeSingle();
+            if (!existingCh) {
+              await db.from("chapters").insert({
+                series_id: seriesId,
+                number: ch.number,
+                title: ch.title,
+                price: 0,
+                source_url: ch.sourceUrl,
+              });
+            } else if (ch.sourceUrl) {
+              await db
+                .from("chapters")
+                .update({ source_url: ch.sourceUrl })
+                .eq("id", existingCh.id);
+            }
+          }
+        } else if (job.source_site === "comix") {
+          const scraped = await scrapeComixSeriesIndex(job.source_url, job.total_chapters || 200);
+          totalChapters = scraped.chapters.length;
+          await appendLog(
+            db,
+            job.id,
+            `Found "${scraped.title}" with ${scraped.chapters.length} chapters`,
+          );
+          const seeded = await seedSeriesSkeleton(db, scraped);
+          seriesId = seeded.seriesId;
+          await appendLog(db, job.id, `Created series ${seriesId} (slug: ${seeded.seriesSlug})`);
         } else {
           throw new Error(`Unsupported source site: ${job.source_site}`);
         }
 
-        const scrapedChapters = scraped.chapters ?? [];
-        await appendLog(
-          db,
-          job.id,
-          `Found "${scraped.title}" with ${scrapedChapters.length} chapters`,
-        );
-
-        // Dedupe: if a series with this source_url already exists, reuse it.
-        const { data: existing } = await db
-          .from("series")
-          .select("id")
-          .eq("source_url", scraped.sourceUrl)
-          .maybeSingle();
-
-        let seriesId: string;
-        if (existing) {
-          seriesId = existing.id;
-          await appendLog(db, job.id, `Reusing existing series row ${seriesId}`);
-        } else {
-          // Upload cover
-          let coverPublicUrl: string | null = null;
-          if (scraped.coverUrl) {
-            try {
-              const { bytes, contentType } = await downloadImage(scraped.coverUrl, job.source_url);
-              const ext = extFromContentType(contentType);
-              coverPublicUrl = await uploadBytes(
-                db,
-                `import/${scraped.slug}/cover.${ext}`,
-                bytes,
-                contentType,
-              );
-            } catch (err) {
-              await appendLog(
-                db,
-                job.id,
-                `Cover download failed: ${(err as Error).message} (continuing)`,
-              );
-            }
-          }
-
-          // Make slug unique
-          let slug = scraped.slug;
-          for (let i = 2; i < 50; i++) {
-            const { data: clash } = await db
-              .from("series")
-              .select("id")
-              .eq("slug", slug)
-              .maybeSingle();
-            if (!clash) break;
-            slug = `${scraped.slug}-${i}`;
-          }
-
-          const { data: created, error: cErr } = await db
-            .from("series")
-            .insert({
-              title: scraped.title,
-              slug,
-              description: scraped.description || null,
-              cover_url: coverPublicUrl,
-              status: scraped.status,
-              type: "manga",
-              author: scraped.author,
-              genres: scraped.genres,
-              source_url: scraped.sourceUrl,
-            })
-            .select("id")
-            .single();
-          if (cErr) throw new Error(`Create series failed: ${cErr.message}`);
-          seriesId = created.id;
-          await appendLog(db, job.id, `Created series ${seriesId} (slug: ${slug})`);
-        }
-
-        // Insert any missing chapter rows (no pages yet).
-        for (const ch of scrapedChapters) {
-          const { data: existingCh } = await db
-            .from("chapters")
-            .select("id")
-            .eq("series_id", seriesId)
-            .eq("number", ch.number)
-            .maybeSingle();
-          if (!existingCh) {
-            await db.from("chapters").insert({
-              series_id: seriesId,
-              number: ch.number,
-              title: ch.title,
-              price: 0,
-              source_url: ch.sourceUrl,
-            });
-          } else if (ch.sourceUrl) {
-            await db.from("chapters").update({ source_url: ch.sourceUrl }).eq("id", existingCh.id);
-          }
-        }
-
         await setJob(db, job.id, {
-          series_id: seriesId,
+          series_id: seriesId!,
           status: "importing_chapters",
-          total_chapters: scrapedChapters.length,
+          total_chapters: totalChapters,
           completed_chapters: 0,
           current_chapter: "Ready to import chapters",
         });
-        await appendLog(db, job.id, `Series ready. Importing ${scrapedChapters.length} chapters…`);
+        await appendLog(db, job.id, `Series ready. Importing ${totalChapters} chapters…`);
 
         const { data: refreshed } = await db
           .from("import_jobs")
@@ -417,14 +430,48 @@ export const runImportStep = createServerFn({ method: "POST" })
         await appendLog(db, job.id, `Importing Ch.${next.number} from ${next.source_url}`);
 
         // Scrape image URLs
-        const imgs = await scrapeMangagoChapterImages(next.source_url!);
+        let imgs: string[];
+        let scrapeId: string | undefined;
+        if (job.source_site === "mangago") {
+          imgs = await scrapeMangagoChapterImages(next.source_url!);
+        } else if (job.source_site === "comix") {
+          const chapterPage = await fetchFirecrawlScrape(next.source_url!, ["markdown", "rawHtml"]);
+          scrapeId = firstString(chapterPage.data?.metadata?.scrapeId);
+          const chapterContent = chapterPage.data?.rawHtml ?? chapterPage.data?.markdown ?? "";
+          imgs = extractImageUrls(chapterContent);
+          if (imgs.length === 0 && scrapeId) {
+            const interactOutput = await fetchFirecrawlInteract(scrapeId, {
+              code: [
+                "const collected = new Set();",
+                "for (let i = 1; i <= 200; i++) {",
+                '  const button = page.getByRole("button", { name: `Go to page ${i}`, exact: true });',
+                "  if ((await button.count()) === 0) break;",
+                "  await button.click();",
+                "  await page.waitForTimeout(400);",
+                '  const srcs = await page.$$eval("img.rpage-page__img", (imgs) => imgs.map((img) => img.getAttribute("src")).filter(Boolean));',
+                "  for (const src of srcs) collected.add(src);",
+                "}",
+                "JSON.stringify([...collected]);",
+              ].join("\n"),
+              language: "node",
+              timeout: 180,
+            });
+            imgs = parseJsonArrayFromText(interactOutput);
+          }
+        } else {
+          throw new Error(`Unsupported source site: ${job.source_site}`);
+        }
         await appendLog(db, job.id, `Found ${imgs.length} images for Ch.${next.number}`);
 
         // Download + upload each, insert chapter_pages
         let pageNum = 1;
         for (const url of imgs) {
           try {
-            const { bytes, contentType } = await downloadImage(url, next.source_url!);
+            const { bytes, contentType } = await downloadRemoteImage(
+              url,
+              next.source_url!,
+              scrapeId,
+            );
             const ext = extFromContentType(contentType);
             const slug = job.series_id.slice(0, 8);
             const path = `import/${slug}/ch-${next.number}/p-${String(pageNum).padStart(
@@ -784,6 +831,159 @@ function parseJsonObjectFromText(text: string): Record<string, unknown> | null {
   }
 
   return null;
+}
+
+type SeriesIndexChapter = {
+  number: number;
+  title: string | null;
+  price: number;
+  sourceUrl: string;
+};
+
+type SeriesIndex = {
+  title: string;
+  description: string | null;
+  author: string | null;
+  slug: string;
+  type: "manga";
+  status: "ongoing";
+  sourceUrl: string;
+  coverUrl: string | null;
+  genres: string[];
+  chapters: SeriesIndexChapter[];
+};
+
+async function scrapeComixSeriesIndex(url: string, chapterLimit: number): Promise<SeriesIndex> {
+  const seriesPage = await fetchFirecrawlScrape(url, ["markdown", "links", "rawHtml"]);
+  const markdown = seriesPage.data?.markdown ?? "";
+  const metadata = seriesPage.data?.metadata ?? {};
+  const links = seriesPage.data?.links ?? [];
+
+  const sourceUrl = metadataString(metadata, "sourceURL", "url") ?? url;
+  const title =
+    metadataString(metadata, "ogTitle", "title") ??
+    markdown
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line && !line.startsWith("[") && !line.includes("Comment"))
+      ?.slice(0, 255) ??
+    "Untitled";
+  const description = metadataString(metadata, "ogDescription", "description");
+  const coverUrl = metadataString(metadata, "ogImage", "image", "favicon");
+  const slug = sourceUrl.replace(/\/+$/, "").split("/").filter(Boolean).pop() ?? undefined;
+
+  const seriesChapters = extractSeriesChapterLinks(markdown, links, sourceUrl).slice(
+    0,
+    chapterLimit,
+  );
+  if (seriesChapters.length === 0) {
+    throw new Error("No chapters found on the series page");
+  }
+
+  return {
+    title,
+    description,
+    author: null,
+    slug: slug ?? "series",
+    type: "manga",
+    status: "ongoing",
+    sourceUrl,
+    coverUrl,
+    genres: [],
+    chapters: seriesChapters.map((chapter) => ({
+      number: chapter.number,
+      title: chapter.title,
+      price: 0,
+      sourceUrl: chapter.sourceUrl,
+    })),
+  };
+}
+
+async function seedSeriesSkeleton(db: DbClient, data: SeriesIndex) {
+  const baseSlug = slugify(data.slug?.trim() || data.title);
+  let seriesId: string | null = null;
+  let seriesSlug = baseSlug || "series";
+
+  const { data: existing, error } = await db
+    .from("series")
+    .select("id, slug")
+    .eq("source_url", data.sourceUrl)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (existing) {
+    seriesId = existing.id;
+    seriesSlug = existing.slug;
+    const { error: updateError } = await db
+      .from("series")
+      .update({
+        title: data.title,
+        description: data.description ?? null,
+        author: data.author ?? null,
+        status: data.status,
+        type: data.type,
+        genres: data.genres,
+        source_url: data.sourceUrl,
+        cover_url: data.coverUrl ?? null,
+      })
+      .eq("id", seriesId);
+    if (updateError) throw new Error(updateError.message);
+  } else {
+    let slug = seriesSlug;
+    for (let i = 2; i < 50; i++) {
+      const { data: clash } = await db.from("series").select("id").eq("slug", slug).maybeSingle();
+      if (!clash) break;
+      slug = `${seriesSlug}-${i}`;
+    }
+    const { data: created, error: createError } = await db
+      .from("series")
+      .insert({
+        title: data.title,
+        slug,
+        description: data.description ?? null,
+        cover_url: data.coverUrl ?? null,
+        status: data.status,
+        type: data.type,
+        author: data.author ?? null,
+        genres: data.genres,
+        source_url: data.sourceUrl,
+      })
+      .select("id, slug")
+      .single();
+    if (createError) throw new Error(createError.message);
+    seriesId = created.id;
+    seriesSlug = created.slug;
+  }
+
+  for (const chapter of data.chapters) {
+    const { data: existingCh, error: chapterLookupError } = await db
+      .from("chapters")
+      .select("id")
+      .eq("series_id", seriesId)
+      .eq("number", chapter.number)
+      .maybeSingle();
+    if (chapterLookupError) throw new Error(chapterLookupError.message);
+    if (existingCh) {
+      await db
+        .from("chapters")
+        .update({
+          title: chapter.title ?? null,
+          price: chapter.price ?? 0,
+          source_url: chapter.sourceUrl ?? null,
+        })
+        .eq("id", existingCh.id);
+      continue;
+    }
+    const { error: insertError } = await db.from("chapters").insert({
+      series_id: seriesId,
+      number: chapter.number,
+      title: chapter.title ?? null,
+      price: chapter.price ?? 0,
+      source_url: chapter.sourceUrl ?? null,
+    });
+    if (insertError) throw new Error(insertError.message);
+  }
+
+  return { seriesId, seriesSlug, totalChapters: data.chapters.length };
 }
 
 async function importGenericSeries(db: DbClient, data: GenericSeriesImport) {

@@ -227,18 +227,28 @@ export function MigratorView() {
     }
     setImportingSourceApi(true);
     try {
-      const res = await importSourceApi({
-        data: {
-          url: sourceApiUrl.trim(),
-          site: sourceApiSite as "mangabuddy" | "kunmanga" | "comix",
-          includeChapterImages,
-          chapterLimit,
-        },
-      });
-      const chapters = getImportedChapterCount(res);
-      toast.success(`Imported ${chapters} chapter${chapters === 1 ? "" : "s"}`);
-      setSourceApiUrl("");
-      await refresh();
+      if (sourceApiSite === "comix") {
+        const { jobId } = await create({
+          data: { sourceUrl: sourceApiUrl.trim(), sourceSite: "comix" },
+        });
+        toast.success("Import job started");
+        setSourceApiUrl("");
+        await refresh();
+        runUntilDone(jobId);
+      } else {
+        const res = await importSourceApi({
+          data: {
+            url: sourceApiUrl.trim(),
+            site: sourceApiSite as "mangabuddy" | "kunmanga",
+            includeChapterImages,
+            chapterLimit,
+          },
+        });
+        const chapters = getImportedChapterCount(res);
+        toast.success(`Imported ${chapters} chapter${chapters === 1 ? "" : "s"}`);
+        setSourceApiUrl("");
+        await refresh();
+      }
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -263,14 +273,21 @@ export function MigratorView() {
     try {
       for (const url of urls) {
         try {
-          await importSourceApi({
-            data: {
-              url,
-              site: sourceApiSite as "mangabuddy" | "kunmanga" | "comix",
-              includeChapterImages,
-              chapterLimit,
-            },
-          });
+          if (sourceApiSite === "comix") {
+            const { jobId } = await create({
+              data: { sourceUrl: url, sourceSite: "comix" },
+            });
+            runUntilDone(jobId);
+          } else {
+            await importSourceApi({
+              data: {
+                url,
+                site: sourceApiSite as "mangabuddy" | "kunmanga",
+                includeChapterImages,
+                chapterLimit,
+              },
+            });
+          }
           ok++;
         } catch (err) {
           failed++;
