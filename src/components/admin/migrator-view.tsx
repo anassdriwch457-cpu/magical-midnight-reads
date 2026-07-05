@@ -227,18 +227,28 @@ export function MigratorView() {
     }
     setImportingSourceApi(true);
     try {
-      const res = await importSourceApi({
-        data: {
-          url: sourceApiUrl.trim(),
-          site: sourceApiSite as "mangabuddy" | "kunmanga" | "comix",
-          includeChapterImages,
-          chapterLimit,
-        },
-      });
-      const chapters = getImportedChapterCount(res);
-      toast.success(`Imported ${chapters} chapter${chapters === 1 ? "" : "s"}`);
-      setSourceApiUrl("");
-      await refresh();
+      if (sourceApiSite === "comix") {
+        const { jobId } = await create({
+          data: { sourceUrl: sourceApiUrl.trim(), sourceSite: "comix" },
+        });
+        toast.success("Import job started");
+        setSourceApiUrl("");
+        await refresh();
+        runUntilDone(jobId);
+      } else {
+        const res = await importSourceApi({
+          data: {
+            url: sourceApiUrl.trim(),
+            site: sourceApiSite as "mangabuddy" | "kunmanga",
+            includeChapterImages,
+            chapterLimit,
+          },
+        });
+        const chapters = getImportedChapterCount(res);
+        toast.success(`Imported ${chapters} chapter${chapters === 1 ? "" : "s"}`);
+        setSourceApiUrl("");
+        await refresh();
+      }
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -263,14 +273,21 @@ export function MigratorView() {
     try {
       for (const url of urls) {
         try {
-          await importSourceApi({
-            data: {
-              url,
-              site: sourceApiSite as "mangabuddy" | "kunmanga" | "comix",
-              includeChapterImages,
-              chapterLimit,
-            },
-          });
+          if (sourceApiSite === "comix") {
+            const { jobId } = await create({
+              data: { sourceUrl: url, sourceSite: "comix" },
+            });
+            runUntilDone(jobId);
+          } else {
+            await importSourceApi({
+              data: {
+                url,
+                site: sourceApiSite as "mangabuddy" | "kunmanga",
+                includeChapterImages,
+                chapterLimit,
+              },
+            });
+          }
           ok++;
         } catch (err) {
           failed++;
@@ -379,8 +396,7 @@ export function MigratorView() {
         <div>
           <h3 className="text-lg font-bold">Series Link Import</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Fetch series data from your scrape API, then save it into Pearltoon. This uses the
-            server-side scraper key from project secrets.
+            Fetch series data from the live scraper, then save it into Pearltoon.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-[1fr_220px]">
@@ -437,7 +453,7 @@ export function MigratorView() {
             ) : (
               <Download className="h-4 w-4" />
             )}
-            Import from Source API
+            Import from Firecrawl
           </Button>
         </div>
         <div className="space-y-1.5">

@@ -1,15 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Database } from "@/integrations/supabase/types";
+
+type DbClient = SupabaseClient<Database>;
+
+function getDbClient(context?: { supabase?: DbClient }): DbClient {
+  return context?.supabase as DbClient;
+}
 
 const BUCKET = "chapter-images";
 
-async function assertStaff(userId: string) {
-  const { data: roles, error } = await supabaseAdmin
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
+async function assertStaff(db: DbClient, userId: string) {
+  const { data: roles, error } = await db.from("user_roles").select("role").eq("user_id", userId);
   if (error) throw new Error(error.message);
   const ok = (roles ?? []).some(
     (r) => r.role === "admin" || r.role === "super_admin" || r.role === "manager",
@@ -80,10 +84,11 @@ export const uploadChapterFromUrls = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => UploadSchema.parse(input))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.userId);
+    const db = getDbClient(context);
+    await assertStaff(db, context.userId);
 
     // Find or create chapter
-    const { data: existing } = await supabaseAdmin
+    const { data: existing } = await db
       .from("chapters")
       .select("id")
       .eq("series_id", data.seriesId)
@@ -93,14 +98,14 @@ export const uploadChapterFromUrls = createServerFn({ method: "POST" })
     let chapterId: string;
     if (existing) {
       chapterId = existing.id;
-      await supabaseAdmin
+      await db
         .from("chapters")
         .update({ title: data.chapterTitle ?? null, price: data.price })
         .eq("id", chapterId);
       // Wipe existing pages so re-upload replaces them
-      await supabaseAdmin.from("chapter_pages").delete().eq("chapter_id", chapterId);
+      await db.from("chapter_pages").delete().eq("chapter_id", chapterId);
     } else {
-      const { data: created, error } = await supabaseAdmin
+      const { data: created, error } = await db
         .from("chapters")
         .insert({
           series_id: data.seriesId,
@@ -127,12 +132,12 @@ export const uploadChapterFromUrls = createServerFn({ method: "POST" })
         const path = `upload/${data.seriesId.slice(0, 8)}/ch-${data.chapterNumber}/p-${String(
           pageNum,
         ).padStart(4, "0")}.${ext}`;
-        const { error: upErr } = await supabaseAdmin.storage
+        const { error: upErr } = await db.storage
           .from(BUCKET)
           .upload(path, bytes, { contentType, upsert: true, cacheControl: "31536000" });
         if (upErr) throw new Error(upErr.message);
-        const { data: pub } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);
-        const { error: insErr } = await supabaseAdmin.from("chapter_pages").insert({
+        const { data: pub } = db.storage.from(BUCKET).getPublicUrl(path);
+        const { error: insErr } = await db.from("chapter_pages").insert({
           chapter_id: chapterId,
           page_number: pageNum,
           image_url: pub.publicUrl,
@@ -157,8 +162,9 @@ export const uploadChapterFromUrls = createServerFn({ method: "POST" })
 export const listSeriesForUpload = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertStaff(context.userId);
-    const { data, error } = await supabaseAdmin
+    const db = getDbClient(context);
+    await assertStaff(db, context.userId);
+    const { data, error } = await db
       .from("series")
       .select("id, title, slug, type")
       .order("title", { ascending: true })
