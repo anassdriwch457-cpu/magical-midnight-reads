@@ -9,18 +9,23 @@ function createSupabaseAdminClient() {
   const SUPABASE_URL = process.env.SUPABASE_URL || "https://debulpewzgatsibelxpg.supabase.co";
   const SUPABASE_SERVICE_ROLE_KEY =
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY_PUBLIC;
+  const SUPABASE_PUBLISHABLE_KEY =
+    process.env.SUPABASE_PUBLISHABLE_KEY || "sb_publishable_YbS6zxPuuRZBIVbrVPxcUw_cquFQlDi";
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    const missing = [
-      ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
-      ...(!SUPABASE_SERVICE_ROLE_KEY ? ["SUPABASE_SERVICE_ROLE_KEY"] : []),
-    ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in your environment settings.`;
+  if (!SUPABASE_URL) {
+    const message = "Missing Supabase environment variable: SUPABASE_URL.";
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
 
-  return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  const supabaseKey = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_PUBLISHABLE_KEY;
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn(
+      "[Supabase] Using publishable-key fallback for admin client; privileged auth operations may be limited.",
+    );
+  }
+
+  return createClient<Database>(SUPABASE_URL, supabaseKey, {
     auth: {
       storage: undefined,
       persistSession: false,

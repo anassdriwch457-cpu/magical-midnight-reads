@@ -26,9 +26,7 @@ export const setUserBan = createServerFn({ method: "POST" })
       .eq("user_id", userId);
     if (rolesErr) throw new Error(rolesErr.message);
 
-    const allowed = (roles ?? []).some(
-      (r) => r.role === "super_admin" || r.role === "manager"
-    );
+    const allowed = (roles ?? []).some((r) => r.role === "super_admin" || r.role === "manager");
     if (!allowed) throw new Error("Insufficient privileges");
 
     // Prevent self-ban
@@ -37,10 +35,9 @@ export const setUserBan = createServerFn({ method: "POST" })
     }
 
     const ban_duration = data.ban ? "876000h" : "none"; // ~100 years or lifted
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(
-      data.targetUserId,
-      { ban_duration }
-    );
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.targetUserId, {
+      ban_duration,
+    });
     if (error) throw new Error(error.message);
 
     return { success: true, banned: data.ban };

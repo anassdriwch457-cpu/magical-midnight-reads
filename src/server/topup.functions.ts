@@ -185,7 +185,7 @@ export const verifyCoinCheckout = createServerFn({ method: "POST" })
       .from("wallets")
       .upsert(
         { user_id: userId, coins: newBalance, updated_at: new Date().toISOString() },
-        { onConflict: "user_id" }
+        { onConflict: "user_id" },
       );
     if (writeErr) throw new Error(writeErr.message);
 
