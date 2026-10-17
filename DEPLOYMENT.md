@@ -1,5 +1,8 @@
 # Deployment Guide — Project Nuvia / Paradise
 
+For an optional editor workflow to verify series titles and author credits before
+entering catalog metadata, see [Catalog research](CATALOG_RESEARCH.md).
+
 This is a **TanStack Start v1** app (React 19 + Vite 7) with full SSR and server functions. It is **not** a static SPA — there is no plain `dist/` folder you can serve from a static host. The build produces a server bundle plus client assets.
 
 ## 1. Supported Deploy Targets
